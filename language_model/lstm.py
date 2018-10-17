@@ -15,6 +15,7 @@ from keras.layers import Embedding, LSTM, Dense, Activation
 
 MODELS_DIR = 'models_dir'
 
+
 def save_model_to_json(model, fname):
     model_json = model.to_json()
     with open('%s/%s.json' % (MODELS_DIR, fname), "w") as json_file:
@@ -35,7 +36,7 @@ class Base_model:
 class LSTM(Base_model):
 
     def __init__(self):
-
+        self.max_sentence_len = 50
         self._initialization()
 
     def _initialization(self):
@@ -47,3 +48,8 @@ class LSTM(Base_model):
         model.add(Dense(uniits=vocab_size))
         model.compile(optimizer='adam', loss='sparse_categorical_crossentropy')
         print(model.summary())
+
+
+    # def generate_word(self):
+    #
+    # def sam

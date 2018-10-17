@@ -27,7 +27,9 @@ def run_xgboost_experiments(seed=42):
         'alpha': hp.quniform('alpha', 0, 1, 0.2), # L1 regularization term on weights
         'tree_method':hp.choice('tree_method',['auto','approx','gpu_exact','gpu_hist']), # the tree construction algorithm
         #'sketch_eps':hp.quniform('sketch_eps', 0.001, 0.03, 0.001), # for tree_method='approx', number of bins (0,1)
-        'scale_pos_weight': 
+        'scale_pos_weight': hp.quniform('scale_pos_weights', 0.5, 1.5, 0.1), # control the balance of positive and negative instances
+        #'updater'
+        'grow_policy':hp.choice('grow_policy', ['depthwise','lossguide']), #
 
 
     }
