@@ -19,6 +19,7 @@ max_features = 20000
 maxlen = 80  # cut texts after this number of words (among top max_features most common words)
 batch_size = 32
 
+## model initialization
 print('Build model...')
 model = Sequential()
 model.add(Embedding(max_features, 128))
