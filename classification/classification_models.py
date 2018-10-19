@@ -16,7 +16,7 @@ def score(params):
     dtrain = xgb.DMatrix(train_features, label=y_train)
     dvalid = xgb.DMatrix(valid_features, label=y_valid)
     watchlist = [(dvalid, 'eval'), (dtrain, 'train')]
-    gbm_model = xgb.train(params, dtrain, num_round,
+    gbm_model = xgb.train(params, dtrain, n_estimators,
                           evals=watchlist,
                           verbose_eval=True)
     predictions = gbm_model.predict(dvalid,
@@ -53,4 +53,35 @@ def run_xgboost_experiments(seed=42):
     best = fmin(score, space, algo=tpe.suggest,max_evals=100)
     return best
 
-train_features = pd.read_csv()
+#train_features = pd.read_csv()
+print('Preparing train...')
+theta = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/theta_50.csv')
+theta_trans = theta.T
+indexing = theta_trans.index.values.tolist()[1:]
+train_features = theta_trans.values[1:]
+indexing = [int(x) for x in indexing]
+
+print('Preparing test...')
+theta_test = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/theta_test_50.csv')
+theta_test_trans = theta_test.T
+indexing_test = theta_test_trans.index.values.tolist()[1:]
+valid_features = theta_test_trans.values[1:]
+indexing_test = [int(x) for x in indexing_test]
+
+print('Preparing y train...')
+y_train = []
+y_train_tmp = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/y_train.csv', header=None).values.tolist()
+for ix in indexing:
+    y_train += [y_train_tmp[ix][0]]
+print(y_train[:10])
+
+print('Preparing y test...')
+y_valid = []
+y_valid_tmp = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/y_test.csv', header=None).values.tolist()
+for ix in indexing_test:
+    y_valid += [y_valid_tmp[int(ix)][0]]
+print(y_valid[:10])
+
+best_hyperparams = run_xgboost_experiments()
+print("The best hyperparameters are: ", "\n")
+print(best_hyperparams)

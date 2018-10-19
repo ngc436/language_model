@@ -49,6 +49,9 @@ def add_pos_tag(word):
 def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len=100, emb_dim=300):
     # x_data = add_pos_tags(x_data)
     tokenizer = Tokenizer(num_words=max_features)
+    x_train = [sent[0] for sent in x_train]
+    x_test = [sent[0] for sent in x_test]
+
     tokenizer.fit_on_texts(x_train + x_test)
     sequences_train = tokenizer.texts_to_sequences(x_train)
     sequences_test = tokenizer.texts_to_sequences(x_test)
@@ -62,12 +65,13 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
     emb_ind = {}
     model = KeyedVectors.load_word2vec_format(path_to_model, binary=True)
     embedding_matrix = np.zeros((len(word_index) + 1, emb_dim))
+    print('Starting embedding matrix preparation...')
     for word, i in word_index.items():
         try:
             emb_vect = model.wv[add_pos_tag(word)]
             embedding_matrix[i] = emb_vect
         except:
-            pass
+            continue
 
     # TODO: change this
     path_to_validation = '/mnt/shdstorage/tmp/validation.csv'
@@ -77,6 +81,18 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
     validation = pad_sequences(validation, maxlen=max_len)
 
     return x_train, y_train, x_test, y_test, embedding_matrix, validation, data['label']
+
+
+# X_train = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_train.csv', header=None).values.tolist()
+# X_test = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_test.csv', header=None).values.tolist()
+# y_train = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/y_train.csv', header=None).values.tolist()
+# y_train = [y[0] for y in y_train]
+# y_test = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/y_test.csv', header=None).values.tolist()
+# y_test = [y[0] for y in y_test]
+#
+# X_train, y_train, X_test, y_test, embedding_matrix, validation, validation_y = prepare_input(X_train, y_train, X_test,
+#                                                                                              y_test)
+
 
 # docs = ['лиса идти лес', 'есть пить чай']
 # print(add_pos_tags(docs))

@@ -21,7 +21,7 @@ from data import prepare_input
 # 89208 tokens
 
 batch_size = 64
-max_features = 89209
+max_features = 172567
 max_len = 100
 emb_dim = 300
 
@@ -37,12 +37,14 @@ X_train, y_train, X_test, y_test, embedding_matrix, validation, validation_y = p
 
 # print(len(X_train), 'train sequences')
 # print(len(X_test), 'test sequences')
-# print('X_train shape:', X_train.shape)
-# print('X_test shape:', X_test.shape)
+print('X_train shape:', X_train.shape)
+print('X_test shape:', X_test.shape)
 # print('y_train shape:', y_train.shape)
 
 print('y_test shape:', y_test.shape)
 print('y_test:', y_test[:100])
+
+print(embedding_matrix[:100])
 
 print('Build model...')
 model = Sequential()
