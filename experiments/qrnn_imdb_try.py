@@ -40,6 +40,7 @@ print('Loading data...')
 print(len(X_train), 'train sequences')
 print(len(X_test), 'test sequences')
 
+
 print('Pad sequences (samples x time)')
 X_train = sequence.pad_sequences(X_train, maxlen=maxlen)
 X_test = sequence.pad_sequences(X_test, maxlen=maxlen)

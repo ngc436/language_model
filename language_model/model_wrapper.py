@@ -1,4 +1,5 @@
 from language_model import QRNN
+import language_model
 
 import numpy as np
 
@@ -10,7 +11,7 @@ from keras.layers import Dense, Activation, Embedding, SpatialDropout1D
 from keras.regularizers import l2
 from keras.constraints import maxnorm
 
-def
+# def
 
 class QRNN_model:
 

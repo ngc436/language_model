@@ -3,13 +3,21 @@
 Current repository contains experiments on language modeling for text classification. 
 
 ## Steps to be done
-- [ ] Prepare train/test/val
+- [x] Prepare train/test/val
+- [ ] Get TM results
 - [ ] Implement QRNN
 - [ ] Implement BiLSTM
-- [ ] Implement simple LM
+- [ ] Implement simple LSTM
 - [ ] Add SVM and XgBoost tools
 - [ ] Milestone: initial classification results (19 oct.)
 - [ ] Implement VAE 
+ 
+ ## Datasets
+ 
+* '/mnt/shdstorage/tmp/classif_tmp/X_train.csv'
+* '/mnt/shdstorage/tmp/classif_tmp/X_test.csv'
+* '/mnt/shdstorage/tmp/classif_tmp/y_train.csv'
+* '/mnt/shdstorage/tmp/classif_tmp/y_test.csv'
  
 ## Literature
 

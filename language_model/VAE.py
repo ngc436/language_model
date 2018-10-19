@@ -25,3 +25,4 @@ class VAE(Layer):
     def __init__(self, units):
         pass
         # TODO: implement_me
+

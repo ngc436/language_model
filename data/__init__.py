@@ -1,1 +1,1 @@
-from .data_preparation import *
+from .data_preparation import prepare_input

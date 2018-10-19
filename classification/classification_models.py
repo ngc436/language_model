@@ -3,12 +3,30 @@ import hyperopt
 from hyperopt import STATUS_OK, Trials, fmin, hp, tpe
 import xgboost as xgb
 import numpy as np
+import pandas as pd
 
 from sklearn import svm
+from sklearn.metrics import roc_auc_score
+from sklearn.cross_validation import train_test_split
 
 
-def xgboost(params):
-    num_estimators = int(params['n_estimators'])
+def score(params):
+    n_estimators = int(params['n_estimators'])
+    del params['n_estimators']
+    dtrain = xgb.DMatrix(train_features, label=y_train)
+    dvalid = xgb.DMatrix(valid_features, label=y_valid)
+    watchlist = [(dvalid, 'eval'), (dtrain, 'train')]
+    gbm_model = xgb.train(params, dtrain, num_round,
+                          evals=watchlist,
+                          verbose_eval=True)
+    predictions = gbm_model.predict(dvalid,
+                                    ntree_limit=gbm_model.best_iteration + 1)
+    score = roc_auc_score(y_valid, predictions)
+    print("\tScore {0}\n\n".format(score))
+    # The score function should return the loss (1-score)
+    # since the optimize function looks for the minimum
+    loss = 1 - score
+    return {'loss': loss, 'status': STATUS_OK}
 
 #
 def run_xgboost_experiments(seed=42):
@@ -30,7 +48,9 @@ def run_xgboost_experiments(seed=42):
         'scale_pos_weight': hp.quniform('scale_pos_weights', 0.5, 1.5, 0.1), # control the balance of positive and negative instances
         #'updater'
         'grow_policy':hp.choice('grow_policy', ['depthwise','lossguide']), #
-
-
+        'seed':42
     }
+    best = fmin(score, space, algo=tpe.suggest,max_evals=100)
     return best
+
+train_features = pd.read_csv()
