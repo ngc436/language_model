@@ -74,7 +74,7 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
             continue
 
     # TODO: change this
-    path_to_validation = '/mnt/shdstorage/tmp/validation.csv'
+    path_to_validation = '/mnt/shdstorage/tmp/validation_2.csv'
     data = pd.read_csv(path_to_validation)
     texts = data.text.tolist()
     validation = tokenizer.texts_to_sequences(texts)
@@ -99,8 +99,8 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
 #
 # path_to_validation = '/mnt/shdstorage/tmp/validation.csv'
 # data = pd.read_csv(path_to_validation)
-# x = data['text'].tolist()
-# print(x)
+# # x = data['text'].tolist()
+# print(data)
 # y = data['label'].tolist()
 # prepare_input(x, y)
 #
