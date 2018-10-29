@@ -3,14 +3,21 @@ import tensorflow as tf
 
 config = tf.ConfigProto()
 config.gpu_options.visible_device_list = "0"
-config.gpu_options.per_process_gpu_memory_fraction = 0.7
+# config.gpu_options.per_process_gpu_memory_fraction = 0.4
 config.allow_soft_placement = True
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
-
+#
 from keras.backend.tensorflow_backend import set_session
 
+#
 set_session(session)
+
+# config = tf.ConfigProto(
+#     device_count={'GPU': 0}
+# )
+# session = tf.Session(config=config)
+# set_session(session)
 
 import numpy as np
 
@@ -19,7 +26,6 @@ from keras import activations, initializers, regularizers, constraints
 from keras.layers import Layer, InputSpec
 
 from keras.utils.conv_utils import conv_output_length
-
 
 
 def _dropout(x, level, noise_shape=None, seed=None):
@@ -141,16 +147,7 @@ class QRNN(Layer):
 
         batch_size = self.input_spec.shape[0]
         if not batch_size:
-            raise ValueError('If a QRNN is stateful, it needs to know '
-                             'its batch size. Specify the batch size '
-                             'of your input tensors: \n'
-                             '- If using a Sequential model, '
-                             'specify the batch size by passing '
-                             'a `batch_input_shape` '
-                             'argument to your first layer.\n'
-                             '- If using the functional API, specify '
-                             'the time dimension by passing a '
-                             '`batch_shape` argument to your Input layer.')
+            raise ValueError('Specify the batch size.')
 
         if self.states[0] is None:
             self.states = [K.zeros((batch_size, self.units))
@@ -177,10 +174,7 @@ class QRNN(Layer):
                 K.set_value(state, value)
 
     def __call__(self, inputs, initial_state=None, **kwargs):
-        # If `initial_state` is specified,
-        # and if it a Keras tensor,
-        # then add it to the inputs and temporarily
-        # modify the input spec to include the state.
+
         if initial_state is not None:
             if hasattr(initial_state, '_keras_history'):
                 # Compute the full input spec, including state
@@ -206,9 +200,7 @@ class QRNN(Layer):
         return super(QRNN, self).__call__(inputs, **kwargs)
 
     def call(self, inputs, mask=None, initial_state=None, training=None):
-        # input shape: `(samples, time (padded with zeros), input_dim)`
-        # note that the .build() method of subclasses MUST define
-        # self.input_spec and self.state_spec with complete input shapes.
+
         if isinstance(inputs, list):
             initial_states = inputs[1:]
             inputs = inputs[0]
@@ -227,16 +219,7 @@ class QRNN(Layer):
         input_shape = K.int_shape(inputs)
         if self.unroll and input_shape[1] is None:
             raise ValueError('Cannot unroll a RNN if the '
-                             'time dimension is undefined. \n'
-                             '- If using a Sequential model, '
-                             'specify the time dimension by passing '
-                             'an `input_shape` or `batch_input_shape` '
-                             'argument to your first layer. If your '
-                             'first layer is an Embedding, you can '
-                             'also use the `input_length` argument.\n'
-                             '- If using the functional API, specify '
-                             'the time dimension by passing a `shape` '
-                             'or `batch_shape` argument to your Input layer.')
+                             'time dimension is undefined.')
         constants = self.get_constants(inputs, training=None)
         preprocessed_input = self.preprocess_input(inputs, training=None)
 
@@ -324,6 +307,5 @@ class QRNN(Layer):
                   'input_dim': self.input_dim,
                   'input_length': self.input_length}
         base_config = super(QRNN, self).get_config()
-
 
         return dict(list(base_config.items()) + list(config.items()))

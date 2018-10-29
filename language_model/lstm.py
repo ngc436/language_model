@@ -1,15 +1,15 @@
 import tensorflow as tf
 
-config = tf.ConfigProto()
-config.gpu_options.visible_device_list = "0"
-config.gpu_options.per_process_gpu_memory_fraction = 0.7
-config.allow_soft_placement = True
-config.gpu_options.allow_growth = True
-session = tf.Session(config=config)
-
-from keras.backend.tensorflow_backend import set_session
-
-set_session(session)
+# config = tf.ConfigProto()
+# config.gpu_options.visible_device_list = "0"
+# config.gpu_options.per_process_gpu_memory_fraction = 0.7
+# config.allow_soft_placement = True
+# config.gpu_options.allow_growth = True
+# session = tf.Session(config=config)
+#
+# from keras.backend.tensorflow_backend import set_session
+#
+# set_session(session)
 from keras.models import Sequential
 from keras.layers import Embedding, LSTM, Dense, Activation
 

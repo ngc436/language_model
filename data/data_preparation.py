@@ -5,13 +5,14 @@ import numpy as np
 from gensim.models import KeyedVectors
 import pandas as pd
 from keras.preprocessing import sequence
+from gensim.models import FastText
 
 import pymorphy2
 
 morph = pymorphy2.MorphAnalyzer()
 
 path_to_model = '/tmp/web_0_300_20.bin'
-
+path_to_fasttext_emb = '/tmp/wiki.ru.bin'
 
 # TODO: check mappings more carefully
 def tag_mappings(tag):
@@ -46,7 +47,7 @@ def add_pos_tag(word):
 # def prepare_validation(validation, max_features=100000, max_len=100, emb_dim=300):
 
 # TODO: convert to class
-def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len=100, emb_dim=300):
+def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len=100, emb_dim=300, verification_name=None, emb_type='fasttext'):
     # x_data = add_pos_tags(x_data)
     tokenizer = Tokenizer(num_words=max_features)
     x_train = [sent[0] for sent in x_train]
@@ -63,7 +64,10 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
     y_test = np.asarray(y_test)
     # computing the index mapping
     emb_ind = {}
-    model = KeyedVectors.load_word2vec_format(path_to_model, binary=True)
+    if emb_type == 'w2v':
+        model = KeyedVectors.load_word2vec_format(path_to_model, binary=True)
+    if emb_type == 'fasttext':
+        model = FastText.load_fasttext_format(path_to_fasttext_emb)
     embedding_matrix = np.zeros((len(word_index) + 1, emb_dim))
     print('Starting embedding matrix preparation...')
     for word, i in word_index.items():
@@ -72,11 +76,11 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
             embedding_matrix[i] = emb_vect
         except:
             continue
-
     # TODO: change this
-    path_to_validation = '/mnt/shdstorage/tmp/validation_2.csv'
-    data = pd.read_csv(path_to_validation)
+    path_to_verification = verification_name
+    data = pd.read_csv(path_to_verification)
     texts = data.text.tolist()
+    print(texts)
     validation = tokenizer.texts_to_sequences(texts)
     validation = pad_sequences(validation, maxlen=max_len)
 

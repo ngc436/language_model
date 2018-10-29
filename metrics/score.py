@@ -1,11 +1,23 @@
 from sklearn.metrics import recall_score, precision_score, f1_score
+import numpy as np
 
 
 def calculate_all_metrics(y_true, y_pred, set_title):
-    print('Metrics for %s' % set_title)
-    print('Recall: %s, Precision: %s, F1: %s' % (calculate_recall(y_true, y_pred),
-                                                 calculate_precision(y_true, y_pred),
-                                                 calculate_f1(y_true, y_pred)))
+    #print('Metrics for %s (1)' % set_title)
+    result_1 = 'Metrics for %s (1)\nRecall: %s, Precision: %s, F1: %s' % (set_title, calculate_recall(y_true, y_pred),
+                                                                          calculate_precision(y_true, y_pred),
+                                                                          calculate_f1(y_true, y_pred))
+    print(result_1)
+    # print('Metrics for %s (0)' % set_title)
+    y_true = 1 - (np.array(y_true))
+    y_pred = 1 - (np.array(y_pred))
+    result_0 = 'Metrics for %s (0)\nRecall: %s, Precision: %s, F1: %s' % (set_title, calculate_recall(y_true, y_pred),
+                                                                          calculate_precision(y_true, y_pred),
+                                                                          calculate_f1(y_true, y_pred))
+    print(result_0)
+
+    print()
+    return result_1, result_0
 
 
 def calculate_recall(y_true, y_pred):
