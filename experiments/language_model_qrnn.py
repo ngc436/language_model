@@ -1,13 +1,23 @@
-from __future__ import print_function
+# TODO: save embedding matrix
+# TODO: find out why loss can go insane and become nan
+
+
+# /tmp/model.h5,
+
+import time
 import numpy as np
+import logging
+
+from vis_tools import *
 
 np.random.seed(1337)  # for reproducibility
 
 from language_model import QRNN
+from metrics import calculate_all_metrics
 
 from keras.preprocessing import sequence
-from keras.models import Sequential
-from keras.layers import Dense, Activation, Embedding, SpatialDropout1D
+from keras.models import Sequential, model_from_json
+from keras.layers import Dense, Activation, Embedding, SpatialDropout1D, Bidirectional
 from keras.regularizers import l2
 from keras.constraints import maxnorm
 from keras.datasets import imdb
@@ -15,60 +25,200 @@ from keras.datasets import imdb
 import pandas as pd
 from data import prepare_input
 
+# logs vs simply write final results to file
+#
+
+
 # data = pd.read_csv('/mnt/shdstorage/tmp/validation.csv')
 # print(data)
 
 # 89208 tokens
 
-batch_size = 64
-max_features = 172567
-max_len = 100
+timing = str(int(time.time()))
+
+batch_size = 32
+max_features = 273046  # 172567
+max_len = 80  # reduce
 emb_dim = 300
 
-X_train = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_train.csv', header=None).values.tolist()
-X_test = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_test.csv', header=None).values.tolist()
-y_train = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/y_train.csv', header=None).values.tolist()
+x_train_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_train_3.csv'
+x_test_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_test_3.csv'
+y_train_labels = '/mnt/shdstorage/tmp/classif_tmp/y_train_3.csv'
+y_test_labels = '/mnt/shdstorage/tmp/classif_tmp/y_test_3.csv'
+verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
+
+emb_type = 'fasttext'
+
+X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
+X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
+y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
 y_train = [y[0] for y in y_train]
-y_test = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/y_test.csv', header=None).values.tolist()
+y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 y_test = [y[0] for y in y_test]
 
-X_train, y_train, X_test, y_test, embedding_matrix, validation, validation_y = prepare_input(X_train, y_train, X_test,
-                                                                                             y_test)
+X_train, y_train, X_test, y_test, embedding_matrix, verification, validation_y = prepare_input(X_train, y_train, X_test,
+                                                                                               y_test,
+                                                                                               verification_name=verification_name,
+                                                                                               emb_type=emb_type)
 
-# print(len(X_train), 'train sequences')
-# print(len(X_test), 'test sequences')
-print('X_train shape:', X_train.shape)
-print('X_test shape:', X_test.shape)
-# print('y_train shape:', y_train.shape)
-
-print('y_test shape:', y_test.shape)
-print('y_test:', y_test[:100])
-
-print(embedding_matrix[:100])
+# ======= PARAMS =======
+spatial_dropout = 0.3
+window_size = 3
+dropout = 0.5
+kernel_regularizer = l2(1e-4)
+bias_regularizer = l2(1e-4)
+kernel_constraint = maxnorm(10)
+bias_constraint = maxnorm(10)
+loss = 'binary_crossentropy'
+optimizer = 'adam'
+epochs = 2
+weights = True
+trainable = False
+# ======= =======
 
 print('Build model...')
 model = Sequential()
-model.add(Embedding(max_features, emb_dim, weights=[embedding_matrix]))
-model.add(SpatialDropout1D(0.2))
-model.add(QRNN(emb_dim, window_size=3, dropout=0.2,
-               kernel_regularizer=l2(1e-4), bias_regularizer=l2(1e-4),
-               kernel_constraint=maxnorm(10), bias_constraint=maxnorm(10)))
+
+if weights:
+    model.add(Embedding(max_features, emb_dim, weights=[embedding_matrix], trainable=trainable))
+else:
+    model.add(Embedding(max_features, emb_dim))
+
+model.add(SpatialDropout1D(spatial_dropout))
+model.add(QRNN(emb_dim, window_size=window_size, dropout=dropout,
+               kernel_regularizer=kernel_regularizer, bias_regularizer=bias_regularizer,
+               kernel_constraint=kernel_constraint, bias_constraint=bias_constraint))
 model.add(Dense(1))
 model.add(Activation('sigmoid'))
 
-# try using different optimizers and different optimizer configs
-model.compile(loss='binary_crossentropy',
-              optimizer='adam',
+plot_losses = PlotLosses()
+callbacks_list = [plot_losses]
+# model.load_weights("/tmp/model_%s.h5"%str(int(time.time())))
+model.compile(loss=loss,
+              optimizer=optimizer,
               metrics=['accuracy'])
+print(model.summary())
 
 print('Loading data...')
 
 print('Train...')
-model.fit(X_train, y_train, batch_size=batch_size, epochs=1, validation_data=(X_test, y_test))
+model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
+          callbacks=callbacks_list)
+# model.load_weights("/tmp/model_3.h5")
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 print('Test score:', score)
 print('Test accuracy:', acc)
-print(model.predict_classes(validation))
-path_to_validation = '/mnt/shdstorage/tmp/validation.csv'
-data = pd.read_csv(path_to_validation)
-print(data)
+
+# serialize weights to HDF5
+path_to_weights = 'models_dir/model_%s.h5' % timing
+model.save_weights(path_to_weights)
+print("Model is saved to disk")
+
+# json_file = open('/tmp/model.json', 'r')
+# loaded_model_json = json_file.read()
+# json_file.close()
+# loaded_model = model_from_json(loaded_model_json)
+# # load weights into new model
+# loaded_model.load_weights("/tmp/model.h5")
+# loaded_model.compile(loss='binary_crossentropy',
+#               optimizer='adam',
+#               metrics=['accuracy'])
+
+train_res = model.predict_classes(X_train)
+train_res = [i[0] for i in train_res]
+train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
+
+test_res = model.predict_classes(X_test)
+test_res = [i[0] for i in test_res]
+test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
+
+ver_res = model.predict_classes(verification)
+path_to_verification = verification_name
+data = pd.read_csv(path_to_verification)
+label = data['label'].tolist()
+ver_res = [i[0] for i in ver_res]
+verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION < 10')
+true_positive = []
+true_negative = []
+for i in range(len(ver_res)):
+    if ver_res[i] == 0 and label[i] == 0:
+        true_negative.append(i)
+    if ver_res[i] == 1 and label[i] == 1:
+        true_positive.append(i)
+
+text = data['text'].tolist()
+raw_text = data['raw_text'].tolist()
+pd.set_option('display.max_colwidth', -1)
+
+print('=========================  TRUE POSITIVE  ============================ ')
+print()
+for i in true_positive:
+    print(text[i])
+    print(raw_text[i])
+    print()
+
+print()
+print()
+print('=========================  TRUE NEGATIVE  ============================ ')
+print()
+for i in true_negative:
+    print(text[i])
+    print(raw_text[i])
+    print()
+
+logs_name = 'logs/%s.txt' % timing
+
+with open(logs_name, 'w') as f:
+    f.write('======= DATASETS =======\n')
+    f.write('Train set data: %s\n' % x_train_set_name)
+    f.write('Test set data: %s\n' % x_test_set_name)
+    f.write('Train labels: %s\n' % y_train_labels)
+    f.write('Test labels: %s\n' % y_test_labels)
+    f.write('Verification data: %s\n' % verification_name)
+    f.write('======= MODEL PARAMS =======\n')
+    if weights:
+        f.write('emb_type: %s, emb dim: %s, trainable: %s\n' % (emb_type, emb_dim, trainable))
+    f.write('batch size: %s, max features: %s, max len: %s\n' % (
+        batch_size, max_features, max_len))
+    f.write('spatial dropout: %s, window size: %s, dropout: %s\n' % (spatial_dropout, window_size, dropout))
+    f.write('kernel regularizer: %s, bias regularizer: %s, kernel constraint: %s, bias constraint: %s\n' % (
+        'l2(1e-4)', 'l2(1e-4)', 'maxnorm(10)', 'maxnorm(10)'))
+    f.write('loss: %s, optimizer: %s, epochs: %s\n' % (loss, optimizer, epochs))
+    f.write('======= RESULTS =======\n')
+    f.write(train_1 + '\n')
+    f.write(train_0 + '\n')
+    f.write(test_1 + '\n')
+    f.write(test_0 + '\n')
+    f.write(verif_1 + '\n')
+    f.write(verif_0 + '\n')
+    f.write('model weights: %s' % path_to_weights + '\n')
+
+# logs file format
+# names of the train/test/verification sets
+# all params of the model
+# file, where weights are saved
+# resulting precision/recall/F1 for all sets
+
+
+# strike = 0
+# positive_negative = 0
+# positive_positive = 0
+# negative_positive = 0
+# negative_negative = 0
+# for i, result in enumerate(val_res):
+#     print(i, result[0], label[i])
+#     if result[0] == 1 and label[i] == 0:
+#         positive_negative += 1
+#     if result[0] == 1 and label[i] == 1:
+#         positive_positive += 1
+#         strike += 1
+#     if result[0] == 0 and label[i] == 1:
+#         negative_positive += 1
+#     if result[0] == 0 and label[i] == 0:
+#         negative_negative += 1
+#         strike += 1
+# print()
+# print(positive_negative, positive_positive, negative_positive, negative_negative)
+#
+# print('Accuracy:', strike/len(label))
+# print(data)
