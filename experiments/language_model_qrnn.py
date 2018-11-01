@@ -1,6 +1,6 @@
 # TODO: save embedding matrix
 # TODO: find out why loss can go insane and become nan
-
+# TODO: count the amount of words that were not in fasttext
 
 # /tmp/model.h5,
 
@@ -36,7 +36,7 @@ from data import prepare_input
 
 timing = str(int(time.time()))
 
-batch_size = 32
+batch_size = 500
 max_features = 273046  # 172567
 max_len = 80  # reduce
 emb_dim = 300
@@ -47,7 +47,7 @@ y_train_labels = '/mnt/shdstorage/tmp/classif_tmp/y_train_3.csv'
 y_test_labels = '/mnt/shdstorage/tmp/classif_tmp/y_test_3.csv'
 verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
 
-emb_type = 'fasttext'
+emb_type = 'fasttext_2'
 
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
@@ -60,18 +60,17 @@ X_train, y_train, X_test, y_test, embedding_matrix, verification, validation_y =
                                                                                                y_test,
                                                                                                verification_name=verification_name,
                                                                                                emb_type=emb_type)
-
 # ======= PARAMS =======
-spatial_dropout = 0.3
+spatial_dropout = 0.1
 window_size = 3
-dropout = 0.5
-kernel_regularizer = l2(1e-4)
-bias_regularizer = l2(1e-4)
+dropout = 0.3
+kernel_regularizer = 1e-6
+bias_regularizer = 1e-6
 kernel_constraint = maxnorm(10)
 bias_constraint = maxnorm(10)
 loss = 'binary_crossentropy'
 optimizer = 'adam'
-epochs = 2
+epochs = 20
 weights = True
 trainable = False
 # ======= =======
@@ -86,7 +85,7 @@ else:
 
 model.add(SpatialDropout1D(spatial_dropout))
 model.add(QRNN(emb_dim, window_size=window_size, dropout=dropout,
-               kernel_regularizer=kernel_regularizer, bias_regularizer=bias_regularizer,
+               kernel_regularizer=l2(kernel_regularizer), bias_regularizer=l2(bias_regularizer),
                kernel_constraint=kernel_constraint, bias_constraint=bias_constraint))
 model.add(Dense(1))
 model.add(Activation('sigmoid'))
@@ -102,9 +101,9 @@ print(model.summary())
 print('Loading data...')
 
 print('Train...')
+# model.load_weights("models_dir/model_1540824326.h5")
 model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
           callbacks=callbacks_list)
-# model.load_weights("/tmp/model_3.h5")
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 print('Test score:', score)
 print('Test accuracy:', acc)
@@ -137,7 +136,7 @@ path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
 label = data['label'].tolist()
 ver_res = [i[0] for i in ver_res]
-verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION < 10')
+verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION >= 10')
 true_positive = []
 true_negative = []
 for i in range(len(ver_res)):
@@ -150,21 +149,23 @@ text = data['text'].tolist()
 raw_text = data['raw_text'].tolist()
 pd.set_option('display.max_colwidth', -1)
 
-print('=========================  TRUE POSITIVE  ============================ ')
-print()
-for i in true_positive:
-    print(text[i])
-    print(raw_text[i])
-    print()
+# print('=========================  TRUE POSITIVE  ============================ ')
+# print()
+# for i in true_positive:
+#     print(text[i])
+#     print(raw_text[i])
+#     print()
+#
+# print()
+# print()
+# print('=========================  TRUE NEGATIVE  ============================ ')
+# print()
+# for i in true_negative:
+#     print(text[i])
+#     print(raw_text[i])
+#     print()
 
-print()
-print()
-print('=========================  TRUE NEGATIVE  ============================ ')
-print()
-for i in true_negative:
-    print(text[i])
-    print(raw_text[i])
-    print()
+# ======================= LOGS =======================
 
 logs_name = 'logs/%s.txt' % timing
 
@@ -182,7 +183,7 @@ with open(logs_name, 'w') as f:
         batch_size, max_features, max_len))
     f.write('spatial dropout: %s, window size: %s, dropout: %s\n' % (spatial_dropout, window_size, dropout))
     f.write('kernel regularizer: %s, bias regularizer: %s, kernel constraint: %s, bias constraint: %s\n' % (
-        'l2(1e-4)', 'l2(1e-4)', 'maxnorm(10)', 'maxnorm(10)'))
+        kernel_regularizer, bias_regularizer, 'maxnorm(10)', 'maxnorm(10)'))
     f.write('loss: %s, optimizer: %s, epochs: %s\n' % (loss, optimizer, epochs))
     f.write('======= RESULTS =======\n')
     f.write(train_1 + '\n')
@@ -192,13 +193,6 @@ with open(logs_name, 'w') as f:
     f.write(verif_1 + '\n')
     f.write(verif_0 + '\n')
     f.write('model weights: %s' % path_to_weights + '\n')
-
-# logs file format
-# names of the train/test/verification sets
-# all params of the model
-# file, where weights are saved
-# resulting precision/recall/F1 for all sets
-
 
 # strike = 0
 # positive_negative = 0
@@ -222,3 +216,5 @@ with open(logs_name, 'w') as f:
 #
 # print('Accuracy:', strike/len(label))
 # print(data)
+
+# 56320/147454 [==========>...................] - ETA: 1:07 - loss: 0.5321 - acc: 0.7312

@@ -1,10 +1,10 @@
+# TODO: tags processing (tokenizer problem)
+
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
-from keras.utils import to_categorical
 import numpy as np
 from gensim.models import KeyedVectors
 import pandas as pd
-from keras.preprocessing import sequence
 from gensim.models import FastText
 
 import pymorphy2
@@ -13,6 +13,8 @@ morph = pymorphy2.MorphAnalyzer()
 
 path_to_model = '/tmp/web_0_300_20.bin'
 path_to_fasttext_emb = '/tmp/wiki.ru.bin'
+path_to_fasttext_emb_2 = '/tmp/ft_native_300_ru_wiki_lenta_lemmatize.bin'
+
 
 # TODO: check mappings more carefully
 def tag_mappings(tag):
@@ -44,10 +46,9 @@ def add_pos_tag(word):
 
 # class Input
 
-# def prepare_validation(validation, max_features=100000, max_len=100, emb_dim=300):
-
 # TODO: convert to class
-def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len=100, emb_dim=300, verification_name=None, emb_type='fasttext'):
+def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len=100, emb_dim=300,
+                  verification_name=None, emb_type='fasttext_2'):
     # x_data = add_pos_tags(x_data)
     tokenizer = Tokenizer(num_words=max_features)
     x_train = [sent[0] for sent in x_train]
@@ -68,6 +69,8 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
         model = KeyedVectors.load_word2vec_format(path_to_model, binary=True)
     if emb_type == 'fasttext':
         model = FastText.load_fasttext_format(path_to_fasttext_emb)
+    if emb_type == 'fasttext_2':
+        model = FastText.load_fasttext_format(path_to_fasttext_emb_2)
     embedding_matrix = np.zeros((len(word_index) + 1, emb_dim))
     print('Starting embedding matrix preparation...')
     for word, i in word_index.items():
@@ -80,12 +83,10 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
     path_to_verification = verification_name
     data = pd.read_csv(path_to_verification)
     texts = data.text.tolist()
-    print(texts)
     validation = tokenizer.texts_to_sequences(texts)
     validation = pad_sequences(validation, maxlen=max_len)
 
     return x_train, y_train, x_test, y_test, embedding_matrix, validation, data['label']
-
 
 # X_train = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_train.csv', header=None).values.tolist()
 # X_test = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_test.csv', header=None).values.tolist()
@@ -96,8 +97,6 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
 #
 # X_train, y_train, X_test, y_test, embedding_matrix, validation, validation_y = prepare_input(X_train, y_train, X_test,
 #                                                                                              y_test)
-
-
 # docs = ['лиса идти лес', 'есть пить чай']
 # print(add_pos_tags(docs))
 #
