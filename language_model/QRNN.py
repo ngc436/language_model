@@ -2,7 +2,7 @@
 import tensorflow as tf
 
 config = tf.ConfigProto()
-config.gpu_options.visible_device_list = "0"
+config.gpu_options.visible_device_list = "1"
 # config.gpu_options.per_process_gpu_memory_fraction = 0.4
 config.allow_soft_placement = True
 config.gpu_options.allow_growth = True
@@ -45,7 +45,7 @@ class QRNN(Layer):
 
     def __init__(self, units, window_size=2, stride=1,
                  return_sequences=False, go_backwards=False,
-                 stateful=False, unroll=False, activation='tanh',
+                 stateful=False, unroll=False, activation='tanh', # tanh
                  kernel_initializer='uniform', bias_initializer='zero',
                  kernel_regularizer=None, bias_regularizer=None,
                  activity_regularizer=None,
