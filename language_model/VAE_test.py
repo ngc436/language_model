@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 config = tf.ConfigProto()
-config.gpu_options.visible_device_list = "1"
+config.gpu_options.visible_device_list = "0"
 # config.gpu_options.per_process_gpu_memory_fraction = 0.4
 config.allow_soft_placement = True
 config.gpu_options.allow_growth = True
@@ -13,6 +13,7 @@ from keras.backend.tensorflow_backend import set_session
 set_session(session)
 
 import numpy as np
+from vis_tools import *
 
 from keras.models import Sequential
 from keras.regularizers import l2
@@ -21,6 +22,7 @@ from keras.layers import Dense, Activation, Embedding, SpatialDropout1D, Bidirec
 from keras.constraints import maxnorm
 from keras.layers.advanced_activations import ELU
 import keras.backend as K
+from keras.backend import clear_session
 from keras.models import Model
 from keras.optimizers import Adam
 
@@ -30,9 +32,9 @@ from data import prepare_input
 print('Build model...')
 
 # ======= PARAMS =======
-batch_size = 128
+batch_size = 32
 max_features = 273046  # 172567
-latent_dim = 800
+latent_dim = 200
 max_len = 80  # reduce
 emb_dim = 300
 int_dim = 96
@@ -46,7 +48,7 @@ kernel_constraint = maxnorm(10)
 bias_constraint = maxnorm(10)
 loss = 'binary_crossentropy'
 optimizer = 'adam'
-epochs = 20
+epochs = 10
 weights = True
 trainable = False
 
@@ -72,7 +74,15 @@ y_test = [y[0] for y in y_test]
 X_train, y_train, X_test, y_test, embedding_matrix, verification, validation_y = prepare_input(X_train, y_train, X_test,
                                                                                                y_test,
                                                                                                verification_name=verification_name,
-                                                                                               emb_type=emb_type)
+                                                                                               emb_type=emb_type,
+                                                                                               max_len=max_len)
+tmp = int((len(X_train))/batch_size)*batch_size
+X_train = X_train[:tmp]
+
+tmp = int((len(X_test))/batch_size)*batch_size
+X_test = X_test[:tmp]
+
+
 x = Input(batch_shape=(None, max_len))
 
 if weights:
@@ -80,7 +90,7 @@ if weights:
 else:
     embedding = Embedding(max_features, emb_dim)(x)
 
-h = Bidirectional(LSTM(int_dim, return_sequences=False, recurrent_dropout=0.2), merge_mode='concat')
+h = Bidirectional(LSTM(int_dim, return_sequences=False, recurrent_dropout=0.2), merge_mode='concat')(embedding)
 h = Dropout(0.2)(h)
 h = Dense(int_dim, activation='linear')(h)
 h = act(h)
@@ -133,11 +143,12 @@ class CustomVariationalLayer(Layer):
 
 loss_layer = CustomVariationalLayer()([x, x_decoded_mean])
 vae = Model(x, [loss_layer])
-opt = Adam(lr=0.001)
+opt = Adam(lr=0.01)
 vae.compile(optimizer='adam', loss=[zero_loss])
 print(vae.summary())
 
-vae.fit(X_train, X_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, X_test))
-score, acc = vae.evaluate(X_test, X_test, batch_size=batch_size)
-print('Test score:', score)
-print('Test accuracy:', acc)
+plot_losses = PlotLosses()
+callbacks_list = [plot_losses]
+vae.fit(X_train, X_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, X_test), callbacks=callbacks_list)
+
+# get latent representation

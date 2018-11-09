@@ -6,6 +6,8 @@ import numpy as np
 from gensim.models import KeyedVectors
 import pandas as pd
 from gensim.models import FastText
+import pickle
+import time
 
 import pymorphy2
 
@@ -46,25 +48,15 @@ def add_pos_tag(word):
 
 # class Input
 
-# TODO: convert to class
-def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len=100, emb_dim=300,
-                  verification_name=None, emb_type='fasttext_2'):
-    # x_data = add_pos_tags(x_data)
+def _train_model(x_train, x_test, max_features=100000, emb_dim=300,
+                 emb_type='fasttext_2', x_train_name=None):
     tokenizer = Tokenizer(num_words=max_features)
-    x_train = [sent[0] for sent in x_train]
-    x_test = [sent[0] for sent in x_test]
-
     tokenizer.fit_on_texts(x_train + x_test)
-    sequences_train = tokenizer.texts_to_sequences(x_train)
-    sequences_test = tokenizer.texts_to_sequences(x_test)
     word_index = tokenizer.word_index
+    # TODO:
+    with open('/tmp/pycharm_project_102/data/embeddings/tokenizer%s.pickle' % (emb_type), 'wb') as handle:
+        pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print('Amount of unique tokens %s' % len(word_index))
-    x_train = pad_sequences(sequences_train, maxlen=max_len)
-    x_test = pad_sequences(sequences_test, maxlen=max_len)
-    y_train = np.asarray(y_train)  # check
-    y_test = np.asarray(y_test)
-    # computing the index mapping
-    emb_ind = {}
     if emb_type == 'w2v':
         model = KeyedVectors.load_word2vec_format(path_to_model, binary=True)
     if emb_type == 'fasttext':
@@ -73,20 +65,57 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
         model = FastText.load_fasttext_format(path_to_fasttext_emb_2)
     embedding_matrix = np.zeros((len(word_index) + 1, emb_dim))
     print('Starting embedding matrix preparation...')
-    for word, i in word_index.items():
-        try:
-            emb_vect = model.wv[add_pos_tag(word)]
-            embedding_matrix[i] = emb_vect
-        except:
-            continue
-    # TODO: change this
+
+    if emb_type == 'w2v':
+        for word, i in word_index.items():
+            try:
+                emb_vect = model.wv[add_pos_tag(word)]
+                embedding_matrix[i] = emb_vect
+            # out of vocabulary exception
+            except:
+                continue
+    else:
+        for word, i in word_index.items():
+            try:
+                emb_vect = model.wv[word]
+                embedding_matrix[i] = emb_vect
+            # out of vocabulary exception
+            except:
+                print(word)
+    np.save('/tmp/pycharm_project_102/data/embeddings/%s_%s.npy' % (emb_type, x_train_name), embedding_matrix)
+    return embedding_matrix
+
+
+# TODO: convert to class
+# TODO: save w2v embeddings
+def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len=100, emb_dim=300,
+                  verification_name=None, emb_type='fasttext_2', x_train_name=None):
+    x_train = [sent[0] for sent in x_train]
+    x_test = [sent[0] for sent in x_test]
+
+    try:
+        embedding_matrix = np.load('/tmp/pycharm_project_102/data/embeddings/%s_%s_%s.npy' % (emb_type, x_train_name, max_features))
+    # not found exception
+    except:
+        embedding_matrix = _train_model(x_train, x_test, max_features, emb_dim,
+                                        emb_type, x_train_name)
+
+    with open('/tmp/pycharm_project_102/data/embeddings/tokenizer%s.pickle' % (emb_type), 'rb') as handle:
+        tokenizer = pickle.load(handle)
+
+    sequences_train = tokenizer.texts_to_sequences(x_train)
+    sequences_test = tokenizer.texts_to_sequences(x_test)
+    x_train = pad_sequences(sequences_train, maxlen=max_len)
+    x_test = pad_sequences(sequences_test, maxlen=max_len)
+    y_train = np.asarray(y_train)  # check
+    y_test = np.asarray(y_test)
     path_to_verification = verification_name
     data = pd.read_csv(path_to_verification)
-    texts = data.text.tolist()
+    texts = data.text.tolist()  #
     validation = tokenizer.texts_to_sequences(texts)
     validation = pad_sequences(validation, maxlen=max_len)
 
-    return x_train, y_train, x_test, y_test, embedding_matrix, validation, data['label']
+    return x_train, y_train, x_test, y_test, embedding_matrix, validation
 
 # X_train = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_train.csv', header=None).values.tolist()
 # X_test = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_test.csv', header=None).values.tolist()

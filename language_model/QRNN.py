@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
-config = tf.ConfigProto()
-config.gpu_options.visible_device_list = "1"
-# config.gpu_options.per_process_gpu_memory_fraction = 0.4
-config.allow_soft_placement = True
-config.gpu_options.allow_growth = True
-session = tf.Session(config=config)
+# config = tf.ConfigProto()
+# config.gpu_options.visible_device_list = "-1"
+# # config.gpu_options.per_process_gpu_memory_fraction = 0.4
+# config.allow_soft_placement = True
+# config.gpu_options.allow_growth = True
+# session = tf.Session(config=config)
 #
 from keras.backend.tensorflow_backend import set_session
 
 #
-set_session(session)
+# set_session(session)
 
 # config = tf.ConfigProto(
 #     device_count={'GPU': 0}

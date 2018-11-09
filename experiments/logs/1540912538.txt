@@ -1,0 +1,26 @@
+======= DATASETS =======
+Train set data: /mnt/shdstorage/tmp/classif_tmp/X_train_3.csv
+Test set data: /mnt/shdstorage/tmp/classif_tmp/X_test_3.csv
+Train labels: /mnt/shdstorage/tmp/classif_tmp/y_train_3.csv
+Test labels: /mnt/shdstorage/tmp/classif_tmp/y_test_3.csv
+Verification data: /mnt/shdstorage/tmp/verification_big.csv
+======= MODEL PARAMS =======
+emb_type: w2v, emb dim: 300, trainable: False
+batch size: 512, max features: 273046, max len: 80
+spatial dropout: 0.1, window size: 3, dropout: 0.3
+kernel regularizer: l2(1e-6), bias regularizer: l2(1e-6), kernel constraint: maxnorm(10), bias constraint: maxnorm(10)
+loss: binary_crossentropy, optimizer: adam, epochs: 10
+======= RESULTS =======
+Metrics for TRAIN (1)
+Recall: 0.8886216210887439, Precision: 0.8844885783813486, F1: 0.8865502827637081
+Metrics for TRAIN (0)
+Recall: 0.9391533571096294, Precision: 0.9414599266306037, F1: 0.9403052273679962
+Metrics for TEST (1)
+Recall: 0.8125394321766561, Precision: 0.833104228996523, F1: 0.8226933365273287
+Metrics for TEST (0)
+Recall: 0.914654316903738, Precision: 0.9029677103318774, F1: 0.9087734434378917
+Metrics for VERIFICATION >= 10 (1)
+Recall: 0.75, Precision: 0.582089552238806, F1: 0.6554621848739495
+Metrics for VERIFICATION >= 10 (0)
+Recall: 0.6266666666666667, Precision: 0.7833333333333333, F1: 0.6962962962962963
+model weights: models_dir/model_1540912538.h5
