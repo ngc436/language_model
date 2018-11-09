@@ -11,11 +11,12 @@ from keras.layers import Dense, Activation, Embedding, SpatialDropout1D
 from keras.regularizers import l2
 from keras.constraints import maxnorm
 
+
 # def
 
 class QRNN_model:
 
-    def __init__(self, max_features=100000, max_len=90,embedding_dim=300, batch_size=64,
+    def __init__(self, max_features=100000, max_len=90, embedding_dim=300, batch_size=64,
                  emb_matrix=None):
         self.max_features = max_features
         self.max_len = max_len
@@ -41,5 +42,4 @@ class QRNN_model:
                       metrics=['accuracy'])
 
     def fit(self):
-
-
+        print()

@@ -3,6 +3,25 @@
 # TODO: count the amount of words that were not in fasttext
 
 # /tmp/model.h5,
+import tensorflow as tf
+
+config = tf.ConfigProto()
+config.gpu_options.visible_device_list = "0"
+# config.gpu_options.per_process_gpu_memory_fraction = 0.4
+config.allow_soft_placement = True
+config.gpu_options.allow_growth = True
+session = tf.Session(config=config)
+
+from keras.backend.tensorflow_backend import set_session
+
+#
+set_session(session)
+
+# config = tf.ConfigProto(
+#     device_count={'GPU': 0}
+# )
+session = tf.Session(config=config)
+set_session(session)
 
 import time
 import numpy as np
@@ -21,6 +40,7 @@ from keras.layers import Dense, Activation, Embedding, SpatialDropout1D, Bidirec
 from keras.regularizers import l2
 from keras.constraints import maxnorm
 from keras.datasets import imdb
+from keras import optimizers
 
 import pandas as pd
 from data import prepare_input
@@ -36,30 +56,37 @@ from data import prepare_input
 
 timing = str(int(time.time()))
 
-batch_size = 500
+batch_size = 32
 max_features = 273046  # 172567
 max_len = 80  # reduce
 emb_dim = 300
 
 x_train_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_train_3.csv'
+x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
 x_test_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_test_3.csv'
 y_train_labels = '/mnt/shdstorage/tmp/classif_tmp/y_train_3.csv'
 y_test_labels = '/mnt/shdstorage/tmp/classif_tmp/y_test_3.csv'
+# set new verification
+# verification_name = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
 
 emb_type = 'fasttext_2'
 
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
+print(len(X_train))
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
 y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
 y_train = [y[0] for y in y_train]
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 y_test = [y[0] for y in y_test]
 
-X_train, y_train, X_test, y_test, embedding_matrix, verification, validation_y = prepare_input(X_train, y_train, X_test,
-                                                                                               y_test,
-                                                                                               verification_name=verification_name,
-                                                                                               emb_type=emb_type)
+# validation y
+X_train, y_train, X_test, y_test, embedding_matrix, verification = prepare_input(X_train, y_train, X_test, y_test,
+                                                                                 max_features=max_features,
+                                                                                 verification_name=verification_name,
+                                                                                 emb_type=emb_type,
+                                                                                 max_len=max_len,
+                                                                                 x_train_name=x_train_name)
 # ======= PARAMS =======
 spatial_dropout = 0.1
 window_size = 3
@@ -70,6 +97,8 @@ kernel_constraint = maxnorm(10)
 bias_constraint = maxnorm(10)
 loss = 'binary_crossentropy'
 optimizer = 'adam'
+lr = 0.0001
+clipnorm = 1.
 epochs = 20
 weights = True
 trainable = False
@@ -93,6 +122,7 @@ model.add(Activation('sigmoid'))
 plot_losses = PlotLosses()
 callbacks_list = [plot_losses]
 # model.load_weights("/tmp/model_%s.h5"%str(int(time.time())))
+optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
 model.compile(loss=loss,
               optimizer=optimizer,
               metrics=['accuracy'])
@@ -104,7 +134,9 @@ print('Train...')
 # model.load_weights("models_dir/model_1540824326.h5")
 model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
           callbacks=callbacks_list)
+
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
+
 print('Test score:', score)
 print('Test accuracy:', acc)
 
@@ -122,6 +154,7 @@ print("Model is saved to disk")
 # loaded_model.compile(loss='binary_crossentropy',
 #               optimizer='adam',
 #               metrics=['accuracy'])
+
 
 train_res = model.predict_classes(X_train)
 train_res = [i[0] for i in train_res]
@@ -184,7 +217,8 @@ with open(logs_name, 'w') as f:
     f.write('spatial dropout: %s, window size: %s, dropout: %s\n' % (spatial_dropout, window_size, dropout))
     f.write('kernel regularizer: %s, bias regularizer: %s, kernel constraint: %s, bias constraint: %s\n' % (
         kernel_regularizer, bias_regularizer, 'maxnorm(10)', 'maxnorm(10)'))
-    f.write('loss: %s, optimizer: %s, epochs: %s\n' % (loss, optimizer, epochs))
+    f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
+        loss, optimizer, lr, clipnorm, epochs))
     f.write('======= RESULTS =======\n')
     f.write(train_1 + '\n')
     f.write(train_0 + '\n')

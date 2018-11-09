@@ -5,12 +5,17 @@ Current repository contains experiments on language modeling for text classifica
 ## Steps to be done
 - [x] Prepare train/test/val
 - [ ] Get TM results
-- [ ] Implement QRNN
+- [x] Implement QRNN
 - [ ] Implement BiLSTM
 - [ ] Implement simple LSTM
 - [ ] Add SVM and XgBoost tools
-- [ ] Milestone: initial classification results (19 oct.)
-- [ ] Implement VAE 
+- [x] Milestone: initial classification results (19 oct.)
+- [x] Implement VAE  
+
+## TODO's
+- [ ] Prepare new test/train/ver with extracted entities
+- [ ] Find out why loss becomes NaN in QRNN
+- [ ] 
  
  ## Datasets
  
