@@ -65,38 +65,44 @@ def _train_model(x_train, x_test, max_features=100000, emb_dim=300,
         model = FastText.load_fasttext_format(path_to_fasttext_emb_2)
     embedding_matrix = np.zeros((len(word_index) + 1, emb_dim))
     print('Starting embedding matrix preparation...')
-
+    set_of_undefined = {}
     if emb_type == 'w2v':
         for word, i in word_index.items():
             try:
-                emb_vect = model.wv[add_pos_tag(word)]
+                emb_vect = model.wv[add_pos_tag(word)].astype(np.float32)
                 embedding_matrix[i] = emb_vect
             # out of vocabulary exception
             except:
-                continue
+                if word not in set_of_undefined:
+                    set_of_undefined[word] = np.random.random(emb_dim)
+                embedding_matrix[i] = set_of_undefined[word]
+
     else:
         for word, i in word_index.items():
             try:
                 emb_vect = model.wv[word]
-                embedding_matrix[i] = emb_vect
+                embedding_matrix[i] = emb_vect.astype(np.float32)
             # out of vocabulary exception
             except:
                 print(word)
-    np.save('/tmp/pycharm_project_102/data/embeddings/%s_%s.npy' % (emb_type, x_train_name), embedding_matrix)
+    np.save('/tmp/pycharm_project_102/data/embeddings/%s_%s_%s.npy' % (emb_type, x_train_name, max_features),
+            embedding_matrix)
     return embedding_matrix
 
 
 # TODO: convert to class
 # TODO: save w2v embeddings
 def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len=100, emb_dim=300,
-                  verification_name=None, emb_type='fasttext_2', x_train_name=None):
+                  verification_name=None, emb_type='fasttext_2', x_train_name=None, path_to_goal_sample=None):
     x_train = [sent[0] for sent in x_train]
     x_test = [sent[0] for sent in x_test]
 
     try:
-        embedding_matrix = np.load('/tmp/pycharm_project_102/data/embeddings/%s_%s_%s.npy' % (emb_type, x_train_name, max_features))
+        embedding_matrix = np.load(
+            '/tmp/pycharm_project_102/data/embeddings/%s_%s_%s.npy' % (emb_type, x_train_name, max_features))
     # not found exception
     except:
+        print('Model does not exist. Initialization...')
         embedding_matrix = _train_model(x_train, x_test, max_features, emb_dim,
                                         emb_type, x_train_name)
 
@@ -107,15 +113,23 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
     sequences_test = tokenizer.texts_to_sequences(x_test)
     x_train = pad_sequences(sequences_train, maxlen=max_len)
     x_test = pad_sequences(sequences_test, maxlen=max_len)
-    y_train = np.asarray(y_train)  # check
+    y_train = np.asarray(y_train)
     y_test = np.asarray(y_test)
     path_to_verification = verification_name
     data = pd.read_csv(path_to_verification)
-    texts = data.text.tolist()  #
-    validation = tokenizer.texts_to_sequences(texts)
-    validation = pad_sequences(validation, maxlen=max_len)
+    texts = data.processed_text.tolist()  # CHANGE HERE
+    verification = tokenizer.texts_to_sequences(texts)
+    verification = pad_sequences(verification, maxlen=max_len)
 
-    return x_train, y_train, x_test, y_test, embedding_matrix, validation
+    # prepare goal sample (columns: processed, text)
+    if path_to_goal_sample:
+        goal = pd.read_csv(path_to_goal_sample)
+        texts = goal.processed_text.tolist()
+        sequences_goal = tokenizer.texts_to_sequences(texts)
+        x_goal = pad_sequences(sequences_goal, maxlen=max_len)
+        return x_train, y_train, x_test, y_test, embedding_matrix, verification, x_goal
+
+    return x_train, y_train, x_test, y_test, embedding_matrix, verification
 
 # X_train = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_train.csv', header=None).values.tolist()
 # X_test = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_test.csv', header=None).values.tolist()

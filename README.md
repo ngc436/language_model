@@ -6,17 +6,31 @@ Current repository contains experiments on language modeling for text classifica
 - [x] Prepare train/test/val
 - [ ] Get TM results
 - [x] Implement QRNN
-- [ ] Implement BiLSTM
+- [x] Implement BiQRNN
 - [ ] Implement simple LSTM
+- [ ] Implement BiLSTM
 - [ ] Add SVM and XgBoost tools
 - [x] Milestone: initial classification results (19 oct.)
 - [x] Implement VAE  
 
 ## TODO's
-- [ ] Prepare new test/train/ver with extracted entities
-- [ ] Find out why loss becomes NaN in QRNN
-- [ ] 
- 
+- [x] Prepare new test/train/ver with extracted entities
+- [x] Find out why loss becomes NaN in QRNN (too high learning rate)
+- [ ] Preprocess embedding data to zero mean and unit variance  
+- [x] Check on models_dir/model_1542027692.h5 weights (w2v embedding)  
+=======================================================================
+- [ ] Prepare verification properly (reprocess, add samples from comments)
+- [ ] Prepare test/train/verif sets with less than 10 tokens
+- [x] Check processed comments (reprocess), and other sets
+- [ ] Prepare model with fasttext embeddings (1 & 2)   
+- [ ] Tune model with hyperopt
+- [ ] Prepare report on language model
+=======================================================================  
+More data 
+- [ ] Divide on chunks  
+- [ ] Add TripAdvisor proocessed comments to train/test
+- [ ]  
+
  ## Datasets
  
 * '/mnt/shdstorage/tmp/classif_tmp/X_train.csv'

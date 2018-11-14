@@ -1,11 +1,19 @@
+# TODO: save matrix of latent representation
+
 import tensorflow as tf
 
-config = tf.ConfigProto()
-config.gpu_options.visible_device_list = "0"
+# config = tf.ConfigProto()
+# config.gpu_options.visible_device_list = "0"
 # config.gpu_options.per_process_gpu_memory_fraction = 0.4
-config.allow_soft_placement = True
-config.gpu_options.allow_growth = True
+# config.allow_soft_placement = True
+# config.gpu_options.allow_growth = True
+# session = tf.Session(config=config)
+
+config = tf.ConfigProto(
+    device_count={'GPU': 0}
+)
 session = tf.Session(config=config)
+# set_session(session)
 #
 from keras.backend.tensorflow_backend import set_session
 
@@ -56,32 +64,46 @@ epsilon_std = 1
 act = ELU()
 # ======= =======
 
-x_train_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_train_3.csv'
-x_test_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_test_3.csv'
-y_train_labels = '/mnt/shdstorage/tmp/classif_tmp/y_train_3.csv'
-y_test_labels = '/mnt/shdstorage/tmp/classif_tmp/y_test_3.csv'
+x_train_set_name = '/mnt/shdstorage/for_classification/X_train_4.csv'
+x_test_set_name = 'mnt/shdstorage/for_classification/X_test_4.csv.csv'
+y_train_labels = '/mnt/shdstorage/for_classification/y_train_4.csv'
+y_test_labels = '/mnt/shdstorage/for_classification/y_test_4.csv'
 verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
 
 emb_type = 'fasttext_2'
 
+path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
+
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
+x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
 y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
 y_train = [y[0] for y in y_train]
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 y_test = [y[0] for y in y_test]
 
-X_train, y_train, X_test, y_test, embedding_matrix, verification, validation_y = prepare_input(X_train, y_train, X_test,
-                                                                                               y_test,
-                                                                                               verification_name=verification_name,
-                                                                                               emb_type=emb_type,
-                                                                                               max_len=max_len)
-tmp = int((len(X_train))/batch_size)*batch_size
+if path_to_goal_sample:
+    X_train, y_train, X_test, y_test, embedding_matrix, verification, goal = prepare_input(X_train, y_train, X_test,
+                                                                                           y_test,
+                                                                                           max_features=max_features,
+                                                                                           verification_name=verification_name,
+                                                                                           emb_type=emb_type,
+                                                                                           max_len=max_len,
+                                                                                           x_train_name=x_train_name,
+                                                                                           path_to_goal_sample=path_to_goal_sample)
+else:
+    X_train, y_train, X_test, y_test, embedding_matrix, verification = prepare_input(X_train, y_train, X_test, y_test,
+                                                                                     max_features=max_features,
+                                                                                     verification_name=verification_name,
+                                                                                     emb_type=emb_type,
+                                                                                     max_len=max_len,
+                                                                                     x_train_name=x_train_name)
+
+tmp = int((len(X_train)) / batch_size) * batch_size
 X_train = X_train[:tmp]
 
-tmp = int((len(X_test))/batch_size)*batch_size
+tmp = int((len(X_test)) / batch_size) * batch_size
 X_test = X_test[:tmp]
-
 
 x = Input(batch_shape=(None, max_len))
 
@@ -149,6 +171,7 @@ print(vae.summary())
 
 plot_losses = PlotLosses()
 callbacks_list = [plot_losses]
-vae.fit(X_train, X_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, X_test), callbacks=callbacks_list)
+vae.fit(X_train, X_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, X_test),
+        callbacks=callbacks_list)
 
 # get latent representation

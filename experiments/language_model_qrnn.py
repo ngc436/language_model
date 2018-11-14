@@ -1,12 +1,10 @@
-# TODO: save embedding matrix
-# TODO: find out why loss can go insane and become nan
-# TODO: count the amount of words that were not in fasttext
+# TODO: perform optimization with hyperopt with text accuracy maximization
 
 # /tmp/model.h5,
 import tensorflow as tf
 
 config = tf.ConfigProto()
-config.gpu_options.visible_device_list = "0"
+config.gpu_options.visible_device_list = "1"
 # config.gpu_options.per_process_gpu_memory_fraction = 0.4
 config.allow_soft_placement = True
 config.gpu_options.allow_growth = True
@@ -20,8 +18,8 @@ set_session(session)
 # config = tf.ConfigProto(
 #     device_count={'GPU': 0}
 # )
-session = tf.Session(config=config)
-set_session(session)
+# session = tf.Session(config=config)
+# set_session(session)
 
 import time
 import numpy as np
@@ -45,63 +43,81 @@ from keras import optimizers
 import pandas as pd
 from data import prepare_input
 
-# logs vs simply write final results to file
-#
-
-
 # data = pd.read_csv('/mnt/shdstorage/tmp/validation.csv')
 # print(data)
 
 # 89208 tokens
 
+
 timing = str(int(time.time()))
 
-batch_size = 32
-max_features = 273046  # 172567
-max_len = 80  # reduce
+batch_size = 256
+# TODO: control the dictionary length
+max_features = 228654  # 172567 in the 3rd version
+max_len = 100  # reduce
 emb_dim = 300
 
-x_train_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_train_3.csv'
+x_train_set_name = '/mnt/shdstorage/for_classification/X_train_5.csv'
 x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-x_test_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_test_3.csv'
-y_train_labels = '/mnt/shdstorage/tmp/classif_tmp/y_train_3.csv'
-y_test_labels = '/mnt/shdstorage/tmp/classif_tmp/y_test_3.csv'
+x_test_set_name = '/mnt/shdstorage/for_classification/X_test_5.csv'
+y_train_labels = '/mnt/shdstorage/for_classification/y_train_5.csv'
+y_test_labels = '/mnt/shdstorage/for_classification/y_test_5.csv'
+
+# x_train_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_train_3.csv'
+# x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
+# x_test_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_test_3.csv'
+# y_train_labels = '/mnt/shdstorage/tmp/classif_tmp/y_train_3.csv'
+# y_test_labels = '/mnt/shdstorage/tmp/classif_tmp/y_test_3.csv'
+
 # set new verification
 # verification_name = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
+
 verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
+path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 
 emb_type = 'fasttext_2'
 
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
-print(len(X_train))
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
 y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
 y_train = [y[0] for y in y_train]
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 y_test = [y[0] for y in y_test]
 
-# validation y
-X_train, y_train, X_test, y_test, embedding_matrix, verification = prepare_input(X_train, y_train, X_test, y_test,
-                                                                                 max_features=max_features,
-                                                                                 verification_name=verification_name,
-                                                                                 emb_type=emb_type,
-                                                                                 max_len=max_len,
-                                                                                 x_train_name=x_train_name)
+if path_to_goal_sample:
+    X_train, y_train, X_test, y_test, embedding_matrix, verification, goal = prepare_input(X_train, y_train, X_test,
+                                                                                           y_test,
+                                                                                           max_features=max_features,
+                                                                                           verification_name=verification_name,
+                                                                                           emb_type=emb_type,
+                                                                                           max_len=max_len,
+                                                                                           x_train_name=x_train_name,
+                                                                                           path_to_goal_sample=path_to_goal_sample)
+else:
+    X_train, y_train, X_test, y_test, embedding_matrix, verification = prepare_input(X_train, y_train, X_test, y_test,
+                                                                                     max_features=max_features,
+                                                                                     verification_name=verification_name,
+                                                                                     emb_type=emb_type,
+                                                                                     max_len=max_len,
+                                                                                     x_train_name=x_train_name)
+
 # ======= PARAMS =======
-spatial_dropout = 0.1
+spatial_dropout = 0.2
 window_size = 3
-dropout = 0.3
+dropout = 0.2
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
-kernel_constraint = maxnorm(10)
-bias_constraint = maxnorm(10)
+kernel_constraint = maxnorm(6)
+bias_constraint = maxnorm(6)
 loss = 'binary_crossentropy'
 optimizer = 'adam'
-lr = 0.0001
-clipnorm = 1.
-epochs = 20
+model_type = 'Bidirectional'
+lr = 0.00002 # changed from 0.00001
+clipnorm = None
+epochs = 15 # 20
 weights = True
-trainable = False
+trainable = True
+previous_weights = None
 # ======= =======
 
 print('Build model...')
@@ -113,27 +129,40 @@ else:
     model.add(Embedding(max_features, emb_dim))
 
 model.add(SpatialDropout1D(spatial_dropout))
-model.add(QRNN(emb_dim, window_size=window_size, dropout=dropout,
-               kernel_regularizer=l2(kernel_regularizer), bias_regularizer=l2(bias_regularizer),
-               kernel_constraint=kernel_constraint, bias_constraint=bias_constraint))
+model.add(Bidirectional(QRNN(emb_dim, window_size=window_size, dropout=dropout,
+                             kernel_regularizer=l2(kernel_regularizer), bias_regularizer=l2(bias_regularizer),
+                             kernel_constraint=kernel_constraint, bias_constraint=bias_constraint)))
 model.add(Dense(1))
 model.add(Activation('sigmoid'))
 
 plot_losses = PlotLosses()
 callbacks_list = [plot_losses]
-# model.load_weights("/tmp/model_%s.h5"%str(int(time.time())))
-optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
+
+if clipnorm:
+    optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
+else:
+    optimizer = optimizers.Adam(lr=lr)
 model.compile(loss=loss,
               optimizer=optimizer,
               metrics=['accuracy'])
 print(model.summary())
 
+# norm = math.sqrt(sum(numpy.sum(K.get_value(w)) for w in model.optimizer.weights))
+
 print('Loading data...')
 
 print('Train...')
-# model.load_weights("models_dir/model_1540824326.h5")
+# previous_weights = "models_dir/model_1542197516.h5"
+# model.load_weights(previous_weights)
+
 model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
           callbacks=callbacks_list)
+
+# ================================= MODEL SAVE =========================================
+
+path_to_weights = "models_dir/model_%s.h5" % (timing)
+model.save_weights(path_to_weights)
+print('Model is saved %s' % path_to_weights)
 
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 
@@ -141,9 +170,6 @@ print('Test score:', score)
 print('Test accuracy:', acc)
 
 # serialize weights to HDF5
-path_to_weights = 'models_dir/model_%s.h5' % timing
-model.save_weights(path_to_weights)
-print("Model is saved to disk")
 
 # json_file = open('/tmp/model.json', 'r')
 # loaded_model_json = json_file.read()
@@ -178,9 +204,38 @@ for i in range(len(ver_res)):
     if ver_res[i] == 1 and label[i] == 1:
         true_positive.append(i)
 
-text = data['text'].tolist()
-raw_text = data['raw_text'].tolist()
-pd.set_option('display.max_colwidth', -1)
+# text = data['text'].tolist()
+# raw_text = data['raw_text'].tolist()
+# pd.set_option('display.max_colwidth', -1)
+
+if path_to_goal_sample:
+    goal_set_name = path_to_goal_sample.split('/')[-1].split('.')[0]
+    goal_res = model.predict_classes(goal)
+    data = pd.read_csv(path_to_goal_sample)['text'].sample(frac=1).tolist()
+    ver_res = [i[0] for i in goal_res]
+    positive = []
+    negative = []
+    pos = open('results/positive_%s_%s.txt' % (goal_set_name, timing), 'w')
+    neg = open('results/negative_%s_%s.txt' % (goal_set_name, timing), 'w')
+    for i in range(len(ver_res)):
+        if goal_res[i] == 0:
+            neg.write('\n==============================================================\n')
+            neg.write('\n')
+            neg.write(data[i])
+            neg.write('\n')
+        else:
+            pos.write('\n==============================================================\n')
+            pos.write('\n')
+            pos.write(data[i])
+            pos.write('\n')
+    pos.close()
+    neg.close()
+
+# ver_res = model.predict_classes(verification)
+# path_to_verification = verification_name
+# data = pd.read_csv(path_to_verification)
+# label = data['label'].tolist()
+# ver_res = [i[0] for i in ver_res]
 
 # print('=========================  TRUE POSITIVE  ============================ ')
 # print()
@@ -200,7 +255,7 @@ pd.set_option('display.max_colwidth', -1)
 
 # ======================= LOGS =======================
 
-logs_name = 'logs/%s.txt' % timing
+logs_name = 'logs/qrnn/%s.txt' % timing
 
 with open(logs_name, 'w') as f:
     f.write('======= DATASETS =======\n')
@@ -210,6 +265,7 @@ with open(logs_name, 'w') as f:
     f.write('Test labels: %s\n' % y_test_labels)
     f.write('Verification data: %s\n' % verification_name)
     f.write('======= MODEL PARAMS =======\n')
+    f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
     if weights:
         f.write('emb_type: %s, emb dim: %s, trainable: %s\n' % (emb_type, emb_dim, trainable))
     f.write('batch size: %s, max features: %s, max len: %s\n' % (

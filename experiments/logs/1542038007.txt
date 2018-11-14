@@ -1,0 +1,27 @@
+======= DATASETS =======
+Train set data: /mnt/shdstorage/for_classification/X_train_4.csv
+Test set data: /mnt/shdstorage/for_classification/X_test_4.csv
+Train labels: /mnt/shdstorage/for_classification/y_train_4.csv
+Test labels: /mnt/shdstorage/for_classification/y_test_4.csv
+Verification data: /mnt/shdstorage/tmp/verification_big.csv
+======= MODEL PARAMS =======
+model type not bidirectional, previous weights: None 
+emb_type: w2v, emb dim: 300, trainable: True
+batch size: 128, max features: 228654, max len: 100
+spatial dropout: 0.1, window size: 3, dropout: 0.2
+kernel regularizer: 1e-07, bias regularizer: 1e-07, kernel constraint: maxnorm(10), bias constraint: maxnorm(10)
+loss: binary_crossentropy, optimizer: <keras.optimizers.Adam object at 0x7f582cdad048>, learning rate: 0.0001, clipnorm: None, epochs: 10
+======= RESULTS =======
+Metrics for TRAIN (1)
+Recall: 0.963290486467903, Precision: 0.9550274569210376, F1: 0.9591411754637862
+Metrics for TRAIN (0)
+Recall: 0.97920297025368, Precision: 0.9831027025126158, F1: 0.9811489613722608
+Metrics for TEST (1)
+Recall: 0.7989852754646225, Precision: 0.8646971053416891, F1: 0.8305434533363908
+Metrics for TEST (0)
+Recall: 0.9126430580709799, Precision: 0.866625196677522, F1: 0.889039039039039
+Metrics for VERIFICATION >= 10 (1)
+Recall: 0.6346153846153846, Precision: 0.559322033898305, F1: 0.5945945945945946
+Metrics for VERIFICATION >= 10 (0)
+Recall: 0.6533333333333333, Precision: 0.7205882352941176, F1: 0.6853146853146852
+model weights: models_dir/model_1542038007.h5
