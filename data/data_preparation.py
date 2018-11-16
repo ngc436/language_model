@@ -1,3 +1,8 @@
+import os.path
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+
 # TODO: tags processing (tokenizer problem)
 
 from keras.preprocessing.text import Tokenizer
@@ -16,6 +21,7 @@ morph = pymorphy2.MorphAnalyzer()
 path_to_model = '/tmp/web_0_300_20.bin'
 path_to_fasttext_emb = '/tmp/wiki.ru.bin'
 path_to_fasttext_emb_2 = '/tmp/ft_native_300_ru_wiki_lenta_lemmatize.bin'
+path_to_fasttext_unlem = '/tmp/ft_native_300_ru_wiki_lenta_lower_case.bin'
 
 
 # TODO: check mappings more carefully
@@ -63,6 +69,8 @@ def _train_model(x_train, x_test, max_features=100000, emb_dim=300,
         model = FastText.load_fasttext_format(path_to_fasttext_emb)
     if emb_type == 'fasttext_2':
         model = FastText.load_fasttext_format(path_to_fasttext_emb_2)
+    if emb_type == 'fasttext_unlem':
+        model = FastText.load_fasttext_format(path_to_fasttext_unlem)
     embedding_matrix = np.zeros((len(word_index) + 1, emb_dim))
     print('Starting embedding matrix preparation...')
     set_of_undefined = {}
@@ -102,7 +110,7 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
             '/tmp/pycharm_project_102/data/embeddings/%s_%s_%s.npy' % (emb_type, x_train_name, max_features))
     # not found exception
     except:
-        print('Model does not exist. Initialization...')
+        print('Embedding model does not exist. Initialization...')
         embedding_matrix = _train_model(x_train, x_test, max_features, emb_dim,
                                         emb_type, x_train_name)
 
@@ -124,12 +132,15 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
     # prepare goal sample (columns: processed, text)
     if path_to_goal_sample:
         goal = pd.read_csv(path_to_goal_sample)
-        texts = goal.processed_text.tolist()
+        texts = goal.processed_text_10.tolist()
         sequences_goal = tokenizer.texts_to_sequences(texts)
         x_goal = pad_sequences(sequences_goal, maxlen=max_len)
         return x_train, y_train, x_test, y_test, embedding_matrix, verification, x_goal
 
     return x_train, y_train, x_test, y_test, embedding_matrix, verification
+
+class Preprocessor():
+    pass
 
 # X_train = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_train.csv', header=None).values.tolist()
 # X_test = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/X_test.csv', header=None).values.tolist()

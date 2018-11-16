@@ -1,2 +1,1 @@
-from .score import *
-from .classificator_predictions import *
+from .score import calculate_all_metrics

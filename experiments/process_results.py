@@ -1,3 +1,23 @@
+log_file_name = '/results/logs/'
+
+def count_size(negative_path, positive_path):
+    counter_neg = 0
+    with open(negative_path) as f:
+        for line in f:
+            if line.startswith('=='):
+                counter_neg += 1
+
+    counter_pos = 0
+    with open(positive_path) as f:
+        for line in f:
+            if line.startswith('=='):
+                counter_pos += 1
+
+    print('negative: %s'%counter_neg)
+    print('positive: %s'%counter_pos)
+    print(counter_neg+counter_pos)
+
+
 def process_file(negative_path, positive_path):
     flag = False
     false_negative = 0
@@ -57,9 +77,9 @@ def extract_for_verification(positive_path, negative_path):
 
 
 def main():
-    positive_path = 'results/positive_comments_big_marked.txt'
-    negative_path = 'results/negative_comments_big_marked.txt'
-    process_file(negative_path, positive_path)
+    positive_path = 'results/positive_comments_big_1542229255.txt'
+    negative_path = 'results/negative_comments_big_1542229255.txt'
+    count_size(negative_path, positive_path)
 
 
 if __name__ == '__main__':

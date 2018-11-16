@@ -1,3 +1,5 @@
+# TODO: finish model wrapper
+
 from language_model import QRNN
 import language_model
 from data import prepare_input
