@@ -1,3 +1,7 @@
+import os.path
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
@@ -44,7 +48,7 @@ class QRNN(Layer):
     '''
 
     def __init__(self, units, window_size=2, stride=1,
-                 return_sequences=False, go_backwards=False,
+                 return_sequences=False, return_state=False, go_backwards=False,
                  stateful=False, unroll=False, activation='tanh', # tanh
                  kernel_initializer='uniform', bias_initializer='zero',
                  kernel_regularizer=None, bias_regularizer=None,
@@ -52,6 +56,7 @@ class QRNN(Layer):
                  kernel_constraint=None, bias_constraint=None,
                  dropout=0, use_bias=True, input_dim=None, input_length=None,
                  **kwargs):
+        self.return_state = return_state
         self.return_sequences = return_sequences
         self.go_backwards = go_backwards
         self.stateful = stateful

@@ -1,3 +1,8 @@
+import os.path
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+
 # TODO: ROC curve vis
 # TODO: visualize word embedding weights
 import keras
