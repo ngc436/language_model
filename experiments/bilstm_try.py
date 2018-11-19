@@ -34,10 +34,10 @@ from metrics import calculate_all_metrics
 
 from keras.preprocessing import sequence
 from keras.models import Sequential, model_from_json
-from keras.layers import Dense, Embedding, SpatialDropout1D, Bidirectional, LSTM, GlobalMaxPool1D, TimeDistributed
+from keras.layers import Dense, Embedding, SpatialDropout1D, Dropout, Bidirectional, LSTM, GlobalMaxPool1D, TimeDistributed
 from keras.regularizers import l2
 from keras.constraints import maxnorm
-from keras.datasets import imdb
+from keras.callbacks import EarlyStopping
 from keras import optimizers
 
 import pandas as pd
@@ -51,9 +51,9 @@ from data import prepare_input
 
 timing = str(int(time.time()))
 
-batch_size = 256
+batch_size = 128
 # TODO: control the dictionary length
-max_features = 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 100000 # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100  # reduce
 emb_dim = 300
 
@@ -107,7 +107,7 @@ spatial_dropout = 0.5
 window_size = 3
 dropout = 0.5
 recurrent_dropout = 0.5
-units = 150
+units = 150                   # 150
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
@@ -115,14 +115,14 @@ bias_constraint = 6
 loss = 'binary_crossentropy'
 optimizer = 'adam'
 model_type = 'Bidirectional'
-lr = 0.01  # changed from 0.00001
+lr = 0.01                     # changed from 0.00001
 clipnorm = None
 epochs = 5  # 20
 weights = True
-trainable = True
+trainable = False
 previous_weights = None
 activation = 'sigmoid'
-time_distributed = True
+time_distributed = False
 # ======= =======
 
 print('Build model...')
@@ -133,17 +133,19 @@ if weights:
 else:
     model.add(Embedding(max_features, emb_dim))
 
-model.add(SpatialDropout1D(spatial_dropout))
+# model.add(SpatialDropout1D(spatial_dropout))
 
-model.add(Bidirectional(LSTM(units, return_sequences=True, dropout=dropout, recurrent_dropout=recurrent_dropout), input_shape=(max_len, 1)))
-# model.add(Dropout(0.5))
+model.add(Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout)))
 # model.add(GlobalMaxPool1D())
 # model.add(Dense(1, activation=activation))
-if time_distributed:
-    model.add(TimeDistributed(Dense(1, activation='sigmoid')))
+# if time_distributed:
+#     model.add(TimeDistributed(Dense(1, activation='sigmoid')))
+model.add(Dropout(dropout))
+model.add(Dense(1, activation=activation))
 
 plot_losses = PlotLosses()
-callbacks_list = [plot_losses]
+early_stopping = EarlyStopping(monitor='val_loss')
+callbacks_list = [plot_losses, early_stopping]
 
 if clipnorm:
     optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)

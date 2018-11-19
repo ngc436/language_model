@@ -1,9 +1,9 @@
 import os.path
 import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-
-# TODO: tags processing (tokenizer problem)
+# TODO: remove wrong tokenizers (old version)
 
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
@@ -56,11 +56,13 @@ def add_pos_tag(word):
 
 def _train_model(x_train, x_test, max_features=100000, emb_dim=300,
                  emb_type='fasttext_2', x_train_name=None):
-    tokenizer = Tokenizer(num_words=max_features)
+    tokenizer = Tokenizer(num_words=max_features + 1, oov_token='oov')
     tokenizer.fit_on_texts(x_train + x_test)
+    tokenizer.word_index = {e:i for e,i in tokenizer.word_index.items() if i <= max_features}
+    tokenizer.word_index[tokenizer.oov_token] = max_features + 1
     word_index = tokenizer.word_index
-    # TODO:
-    with open('/tmp/pycharm_project_102/data/embeddings/tokenizer%s.pickle' % (emb_type), 'wb') as handle:
+    with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
+    emb_type, x_train_name, max_features), 'wb') as handle:
         pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print('Amount of unique tokens %s' % len(word_index))
     if emb_type == 'w2v':
@@ -72,6 +74,7 @@ def _train_model(x_train, x_test, max_features=100000, emb_dim=300,
     if emb_type == 'fasttext_unlem':
         model = FastText.load_fasttext_format(path_to_fasttext_unlem)
     embedding_matrix = np.zeros((len(word_index) + 1, emb_dim))
+    print(len(word_index))
     print('Starting embedding matrix preparation...')
     set_of_undefined = {}
     if emb_type == 'w2v':
@@ -93,7 +96,7 @@ def _train_model(x_train, x_test, max_features=100000, emb_dim=300,
             # out of vocabulary exception
             except:
                 print(word)
-    np.save('/tmp/pycharm_project_102/data/embeddings/%s_%s_%s.npy' % (emb_type, x_train_name, max_features),
+    np.save('/home/gmaster/projects/negRevClassif/data/embeddings/%s_%s_%s.npy' % (emb_type, x_train_name, max_features),
             embedding_matrix)
     return embedding_matrix
 
@@ -107,14 +110,15 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
 
     try:
         embedding_matrix = np.load(
-            '/tmp/pycharm_project_102/data/embeddings/%s_%s_%s.npy' % (emb_type, x_train_name, max_features))
+            '/home/gmaster/projects/negRevClassif/data/embeddings/%s_%s_%s.npy' % (emb_type, x_train_name, max_features))
     # not found exception
     except:
         print('Embedding model does not exist. Initialization...')
-        embedding_matrix = _train_model(x_train, x_test, max_features, emb_dim,
-                                        emb_type, x_train_name)
+        embedding_matrix = _train_model(x_train=x_train, x_test=x_test, max_features=max_features, emb_dim=emb_dim,
+                                        emb_type=emb_type, x_train_name=x_train_name)
 
-    with open('/tmp/pycharm_project_102/data/embeddings/tokenizer%s.pickle' % (emb_type), 'rb') as handle:
+    with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
+    emb_type, x_train_name, max_features), 'rb') as handle:
         tokenizer = pickle.load(handle)
 
     sequences_train = tokenizer.texts_to_sequences(x_train)
@@ -123,6 +127,8 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
     x_test = pad_sequences(sequences_test, maxlen=max_len)
     y_train = np.asarray(y_train)
     y_test = np.asarray(y_test)
+
+    # oov
     path_to_verification = verification_name
     data = pd.read_csv(path_to_verification)
     texts = data.processed_text.tolist()  # CHANGE HERE
@@ -138,6 +144,26 @@ def prepare_input(x_train, y_train, x_test, y_test, max_features=100000, max_len
         return x_train, y_train, x_test, y_test, embedding_matrix, verification, x_goal
 
     return x_train, y_train, x_test, y_test, embedding_matrix, verification
+
+
+def oov_processing():
+    # if word exists at least in 10% of documents leave it
+    # in other case, substitute to oov
+    raise NotImplementedError
+
+
+def prepare_sequence(text):
+    # TODO: remove hardcore
+    text = [text]
+    with open(
+            '/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % ('fasttext_2', 'X_train_5', 291837),
+            'rb') as handle:
+        tokenizer = pickle.load(handle)
+    sequences = tokenizer.texts_to_sequences(text)
+    x = pad_sequences(sequences, maxlen=100)
+    # y_test = np.asarray(y_test)
+    return x
+
 
 class Preprocessor():
     pass

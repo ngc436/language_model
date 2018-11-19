@@ -62,7 +62,8 @@ trainable = False
 
 epsilon_std = 1
 act = ELU()
-# ======= =======
+
+# ======= DATASETS =======
 
 x_train_set_name = '/mnt/shdstorage/for_classification/X_train_4.csv'
 x_test_set_name = 'mnt/shdstorage/for_classification/X_test_4.csv.csv'

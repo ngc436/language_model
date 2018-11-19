@@ -26,12 +26,12 @@ Current repository contains experiments on language modeling for text classifica
 - [ ] Reduce the dictionary and substitute rare words with oov (?)
 - [ ] Change percentage of positive examples in training set (?)
 - [ ] Tune model with hyperopt
-- [ ] Check model_1542229255 on comments with more than 50 tokens
+- [x] Check model_1542229255 on comments with more than 50 tokens
 - [ ] Prepare report on language model
 - [ ] Rewrite to pipeline
 =======================================================================  
 - [x] Try simple bilstm  
-- [ ] Find out  what's happening inside of neural network  (in progress)
+- [x] Find out  what's happening inside of neural network  (in progress)
 - [ ] Try ELMo embeddings  (in progress)
 - [ ] Add context  
 =======================================================================  
@@ -39,10 +39,14 @@ More data
 - [x] Divide on chunks  
 - [x] Add TripAdvisor proocessed comments to train/test
 - [x] Introduce new train/test/ver v5 
+Better data
+- [ ] Change very rare tokens to oov
 
  ## Datasets
  
-* '/mnt/shdstorage/tmp/classif_tmp/X_train.csv'
+ v - dataset version  
+ 
+* '/mnt/shdstorage/tmp/classif_tmp/X_train_v.csv'
 * '/mnt/shdstorage/tmp/classif_tmp/X_test.csv'
 * '/mnt/shdstorage/tmp/classif_tmp/y_train.csv'
 * '/mnt/shdstorage/tmp/classif_tmp/y_test.csv'
