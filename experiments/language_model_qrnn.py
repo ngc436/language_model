@@ -43,11 +43,11 @@ from keras.models import Sequential, model_from_json
 from keras.layers import Dense, Activation, Embedding, SpatialDropout1D, Bidirectional, LSTM
 from keras.regularizers import l2
 from keras.constraints import maxnorm
-from keras.datasets import imdb
+from keras.callbacks import EarlyStopping
 from keras import optimizers
 
 import pandas as pd
-from data import prepare_input
+from data import prepare_input, prepare_sequence
 
 from collections import OrderedDict
 import matplotlib.pyplot as plt
@@ -64,17 +64,17 @@ from lime.lime_text import LimeTextExplainer
 
 timing = str(int(time.time()))
 
-batch_size = 256
+batch_size = 512
 # TODO: control the dictionary length
-max_features = 515027  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100  # reduce
 emb_dim = 300
 
-x_train_set_name = '/mnt/shdstorage/for_classification/X_train_5_unlem.csv'
+x_train_set_name = '/mnt/shdstorage/for_classification/X_train_5.csv'
 x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-x_test_set_name = '/mnt/shdstorage/for_classification/X_test_5_unlem.csv'
-y_train_labels = '/mnt/shdstorage/for_classification/y_train_5_unlem.csv'
-y_test_labels = '/mnt/shdstorage/for_classification/y_test_5_unlem.csv'
+x_test_set_name = '/mnt/shdstorage/for_classification/X_test_5.csv'
+y_train_labels = '/mnt/shdstorage/for_classification/y_train_5.csv'
+y_test_labels = '/mnt/shdstorage/for_classification/y_test_5.csv'
 
 # x_train_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_train_3.csv'
 # x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
@@ -85,11 +85,11 @@ y_test_labels = '/mnt/shdstorage/for_classification/y_test_5_unlem.csv'
 # set new verification
 # verification_name = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 
-verification_name = '/mnt/shdstorage/tmp/verification_big_unlem.csv'
-path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test_unlem.csv'
+verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
+path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
 # path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 
-emb_type = 'fasttext_unlem'
+emb_type = 'fasttext_2'
 
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
@@ -126,7 +126,7 @@ bias_constraint = 6
 loss = 'binary_crossentropy'
 optimizer = 'adam'
 model_type = 'Bidirectional'
-lr = 0.001  # changed from 0.00001
+lr = 0.0001  # changed from 0.00001
 clipnorm = None
 epochs = 15  # 20
 weights = True
@@ -151,7 +151,8 @@ model.add(Bidirectional(QRNN(emb_dim, window_size=window_size, dropout=dropout,
 model.add(Dense(1, activation=activation))
 
 plot_losses = PlotLosses()
-callbacks_list = [plot_losses]
+early_stopping = EarlyStopping(monitor='val_loss')
+callbacks_list = [plot_losses, early_stopping]
 
 if clipnorm:
     optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
@@ -166,40 +167,67 @@ print(model.summary())
 
 print('Loading data...')
 
-# print('Train...')
-# previous_weights = "models_dir/model_1542229255.h5"
-# model.load_weights(previous_weights)
+print('Train...')
+previous_weights = "models_dir/model_1542372842.h5"
+model.load_weights(previous_weights)
 
-model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
-          callbacks=callbacks_list)
+
+# model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
+#           callbacks=callbacks_list)
 
 # ================================= MODEL SAVE =========================================
 
-path_to_weights = "models_dir/model_%s.h5" % (timing)
-model.save_weights(path_to_weights)
-print('Model is saved %s' % path_to_weights)
+# path_to_weights = "models_dir/model_%s.h5" % (timing)
+# model.save_weights(path_to_weights)
+# print('Model is saved %s' % path_to_weights)
+
+
+# ====== compute feature importance with LIME ======
+
+def predict_wrapper(text):
+    '''
+
+    :param text:
+    :return answer: array of shape = [n_samples, n_classes]
+    '''
+    if isinstance(text, str):
+        text = prepare_sequence(text)
+        answer = np.zeros(shape=(1, 2))
+        answer[0][0] = model.predict(text)[0][0]
+        answer[0][1] = 1 - answer[0][0]
+        print('Probability(class 1) =', answer[0][0])
+        print('True class: %s' % model.predict_classes(text))
+    if isinstance(text, list):
+        answer = np.zeros(shape=(len(text), 2))
+        for i in range(len(text)):
+            tmp = prepare_sequence(text[i])
+            answer[i][0] = 1 - answer[i][0]           # probability of class 0 (without negative comments)
+            answer[i][1] = model.predict(tmp)[0][0]   # probability of class 1 (with negative comments)
+    return np.array(answer)
+
+
+idx = [6]
+
+print(verification[idx])
+class_names = ['negative', 'positive'] #
+explainer = LimeTextExplainer(class_names=class_names)  # class_names)
+data = pd.read_csv(path_to_goal_sample)
+data = data.processed_text[idx].values.tolist()[0]
+print(predict_wrapper(data))
+exp = explainer.explain_instance(text_instance=data, classifier_fn=predict_wrapper, num_features=15)
+weights = OrderedDict(exp.as_list())
+lime_weights = pd.DataFrame({'words': list(weights.keys()), 'weights': list(weights.values())})
+sns.barplot(x="words", y="weights", data=lime_weights)
+plt.xticks(rotation=45)
+plt.title('Sample {} features weights given by LIME'.format(idx))
+plt.show()
+
+# ====== END ======
 
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 
 print('Test score:', score)
 print('Test accuracy:', acc)
-
-# serialize weights to HDF5
-
-# json_file = open('/tmp/model.json', 'r')
-# loaded_model_json = json_file.read()
-# json_file.close()
-# loaded_model = model_from_json(loaded_model_json)
-# # load weights into new model
-# loaded_model.load_weights("/tmp/model.h5")
-# loaded_model.compile(loss='binary_crossentropy',
-#               optimizer='adam',
-#               metrics=['accuracy'])
-
-
-def predict_wrapper(text):
-    return model.predict(verification)
-
 
 train_res = model.predict_classes(X_train)
 train_res = [i[0] for i in train_res]
@@ -292,7 +320,7 @@ with open(logs_name, 'w') as f:
     f.write('batch size: %s, max features: %s, max len: %s\n' % (
         batch_size, max_features, max_len))
     f.write('spatial dropout: %s, window size: %s, dropout: %s, activation: %s\n' % (
-    spatial_dropout, window_size, dropout, activation))
+        spatial_dropout, window_size, dropout, activation))
     f.write('kernel regularizer: %s, bias regularizer: %s, kernel constraint: %s, bias constraint: %s\n' % (
         kernel_regularizer, bias_regularizer, 'maxnorm(%s)' % kernel_constraint, 'maxnorm(%s)' % bias_constraint))
     f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
@@ -305,22 +333,6 @@ with open(logs_name, 'w') as f:
     f.write(verif_1 + '\n')
     f.write(verif_0 + '\n')
     f.write('model weights: %s' % path_to_weights + '\n')
-
-# ====== compute feature importance with LIME ======
-class_names = ['negative', 'positive']
-explainer = LimeTextExplainer(class_names=class_names)
-# define test sample
-data = pd.read_csv(path_to_goal_sample)
-print(verification)
-explanation = explainer.explain_instance(data['processed_text'], predict_wrapper, num_features=10)
-weights = OrderedDict(explanation.as_list())
-lime_weights = pd.DataFrame({'words': list(weights.keys()), 'weights': list(weights.values())})
-print(lime_weights.head())
-sns.barplot(x='words', y='weights', data=lime_weights)
-plt.xticks(rotation=45)
-plt.title('Sample features weights')
-plt.show()
-
 
 # strike = 0
 # positive_negative = 0

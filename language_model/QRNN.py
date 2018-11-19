@@ -49,7 +49,7 @@ class QRNN(Layer):
 
     def __init__(self, units, window_size=2, stride=1,
                  return_sequences=False, return_state=False, go_backwards=False,
-                 stateful=False, unroll=False, activation='tanh', # tanh
+                 stateful=False, unroll=False, activation='tanh',
                  kernel_initializer='uniform', bias_initializer='zero',
                  kernel_regularizer=None, bias_regularizer=None,
                  activity_regularizer=None,
