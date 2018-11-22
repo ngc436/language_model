@@ -34,47 +34,30 @@ from metrics import calculate_all_metrics
 
 from keras.preprocessing import sequence
 from keras.models import Sequential, model_from_json
-from keras.layers import Dense, Embedding, SpatialDropout1D, Dropout, Bidirectional, LSTM, GlobalMaxPool1D, TimeDistributed
+from keras.layers import Dense, Embedding, SpatialDropout1D, Dropout, Bidirectional, LSTM, GlobalMaxPool1D
 from keras.regularizers import l2
 from keras.constraints import maxnorm
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from keras import optimizers
 
 import pandas as pd
 from data import prepare_input
 
-# data = pd.read_csv('/mnt/shdstorage/tmp/validation.csv')
-# print(data)
-
-# 89208 tokens
-
-
 timing = str(int(time.time()))
 
 batch_size = 128
-# TODO: control the dictionary length
-max_features = 100000 # 291837  # 172567 in the 3rd version # 228654 in the 4th version
-max_len = 100  # reduce
+max_features = 150000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_len = 100
 emb_dim = 300
 
-x_train_set_name = '/mnt/shdstorage/for_classification/X_train_5.csv'
+x_train_set_name = '/mnt/shdstorage/for_classification/X_train_6.csv'
 x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-x_test_set_name = '/mnt/shdstorage/for_classification/X_test_5.csv'
-y_train_labels = '/mnt/shdstorage/for_classification/y_train_5.csv'
-y_test_labels = '/mnt/shdstorage/for_classification/y_test_5.csv'
-
-# x_train_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_train_3.csv'
-# x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-# x_test_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_test_3.csv'
-# y_train_labels = '/mnt/shdstorage/tmp/classif_tmp/y_train_3.csv'
-# y_test_labels = '/mnt/shdstorage/tmp/classif_tmp/y_test_3.csv'
-
-# set new verification
-# verification_name = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
+x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6.csv'
+y_train_labels = '/mnt/shdstorage/for_classification/y_train_6.csv'
+y_test_labels = '/mnt/shdstorage/for_classification/y_test_6.csv'
 
 verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
 path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
-# path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 
 emb_type = 'fasttext_2'
 
@@ -103,11 +86,11 @@ else:
                                                                                      x_train_name=x_train_name)
 
 # ======= PARAMS =======
-spatial_dropout = 0.5
+spatial_dropout = 0.2
 window_size = 3
 dropout = 0.5
 recurrent_dropout = 0.5
-units = 150                   # 150
+units = 100
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
@@ -115,9 +98,9 @@ bias_constraint = 6
 loss = 'binary_crossentropy'
 optimizer = 'adam'
 model_type = 'Bidirectional'
-lr = 0.01                     # changed from 0.00001
+lr = 0.001
 clipnorm = None
-epochs = 5  # 20
+epochs = 100
 weights = True
 trainable = False
 previous_weights = None
@@ -133,19 +116,19 @@ if weights:
 else:
     model.add(Embedding(max_features, emb_dim))
 
-# model.add(SpatialDropout1D(spatial_dropout))
+model.add(SpatialDropout1D(spatial_dropout))
 
 model.add(Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout)))
 # model.add(GlobalMaxPool1D())
 # model.add(Dense(1, activation=activation))
-# if time_distributed:
-#     model.add(TimeDistributed(Dense(1, activation='sigmoid')))
 model.add(Dropout(dropout))
 model.add(Dense(1, activation=activation))
 
 plot_losses = PlotLosses()
-early_stopping = EarlyStopping(monitor='val_loss')
-callbacks_list = [plot_losses, early_stopping]
+#
+# early_stopping = EarlyStopping(monitor='val_loss')
+reduce_lr = ReduceLROnPlateau(monitor='val_loss')
+callbacks_list = [plot_losses, reduce_lr]  # early_stopping]
 
 if clipnorm:
     optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
@@ -162,8 +145,8 @@ print('Loading data...')
 
 # model_1542368228.h5
 
-# print('Train...')
-# previous_weights = "models_dir/model_1542229255.h5"
+print('Train...')
+# previous_weights = "models_dir/model_1542711790.h5"
 # model.load_weights(previous_weights)
 
 
@@ -269,11 +252,11 @@ with open(logs_name, 'w') as f:
     f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
     if weights:
         f.write('emb_type: %s, emb dim: %s, trainable: %s, time distributed: %s\n' % (
-        emb_type, emb_dim, trainable, time_distributed))
+            emb_type, emb_dim, trainable, time_distributed))
     f.write('batch size: %s, max features: %s, max len: %s\n' % (
         batch_size, max_features, max_len))
     f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
-    window_size, dropout, recurrent_dropout, units, activation))
+        window_size, dropout, recurrent_dropout, units, activation))
     f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
         loss, optimizer, lr, clipnorm, epochs))
     f.write('======= RESULTS =======\n')
@@ -309,3 +292,5 @@ with open(logs_name, 'w') as f:
 # print(data)
 
 # 56320/147454 [==========>...................] - ETA: 1:07 - loss: 0.5321 - acc: 0.7312
+
+# model_1542708525.h5 -> model_1542711790.h5

@@ -11,6 +11,7 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from keras.backend.tensorflow_backend import set_session
+from matplotlib.backends.backend_pdf import PdfPages
 
 #
 set_session(session)
@@ -29,7 +30,6 @@ sys.path.append(file_dir)
 
 import time
 import numpy as np
-import logging
 
 from vis_tools import *
 
@@ -43,7 +43,7 @@ from keras.models import Sequential, model_from_json
 from keras.layers import Dense, Activation, Embedding, SpatialDropout1D, Bidirectional, LSTM
 from keras.regularizers import l2
 from keras.constraints import maxnorm
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from keras import optimizers
 
 import pandas as pd
@@ -64,17 +64,17 @@ from lime.lime_text import LimeTextExplainer
 
 timing = str(int(time.time()))
 
-batch_size = 512
+batch_size = 32
 # TODO: control the dictionary length
-max_features = 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 200000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100  # reduce
 emb_dim = 300
 
-x_train_set_name = '/mnt/shdstorage/for_classification/X_train_5.csv'
+x_train_set_name = '/mnt/shdstorage/for_classification/X_train_6.csv'
 x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-x_test_set_name = '/mnt/shdstorage/for_classification/X_test_5.csv'
-y_train_labels = '/mnt/shdstorage/for_classification/y_train_5.csv'
-y_test_labels = '/mnt/shdstorage/for_classification/y_test_5.csv'
+x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6.csv'
+y_train_labels = '/mnt/shdstorage/for_classification/y_train_6.csv'
+y_test_labels = '/mnt/shdstorage/for_classification/y_test_6.csv'
 
 # x_train_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_train_3.csv'
 # x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
@@ -86,8 +86,8 @@ y_test_labels = '/mnt/shdstorage/for_classification/y_test_5.csv'
 # verification_name = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 
 verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
-path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
-# path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
+# path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
+path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 
 emb_type = 'fasttext_2'
 
@@ -116,7 +116,7 @@ else:
                                                                                      x_train_name=x_train_name)
 
 # ======= PARAMS =======
-spatial_dropout = 0.5
+spatial_dropout = 0.4
 window_size = 3
 dropout = 0.5
 kernel_regularizer = 1e-6
@@ -128,7 +128,7 @@ optimizer = 'adam'
 model_type = 'Bidirectional'
 lr = 0.0001  # changed from 0.00001
 clipnorm = None
-epochs = 15  # 20
+epochs = 10  # 20
 weights = True
 trainable = True
 previous_weights = None
@@ -151,8 +151,9 @@ model.add(Bidirectional(QRNN(emb_dim, window_size=window_size, dropout=dropout,
 model.add(Dense(1, activation=activation))
 
 plot_losses = PlotLosses()
-early_stopping = EarlyStopping(monitor='val_loss')
-callbacks_list = [plot_losses, early_stopping]
+# early_stopping = EarlyStopping(monitor='val_loss', restore_best_weights=True)
+reduce_rate = ReduceLROnPlateau(monitor='val_loss')
+callbacks_list = [plot_losses, reduce_rate]  # early_stopping]
 
 if clipnorm:
     optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
@@ -168,18 +169,46 @@ print(model.summary())
 print('Loading data...')
 
 print('Train...')
-previous_weights = "models_dir/model_1542372842.h5"
-model.load_weights(previous_weights)
+
+# previous_weights = "models_dir/model_1542372842.h5"
+# model.load_weights(previous_weights)
 
 
-# model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
-#           callbacks=callbacks_list)
+model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
+          callbacks=callbacks_list)
 
 # ================================= MODEL SAVE =========================================
 
-# path_to_weights = "models_dir/model_%s.h5" % (timing)
-# model.save_weights(path_to_weights)
-# print('Model is saved %s' % path_to_weights)
+path_to_weights = "models_dir/model_%s.h5" % (timing)
+model.save_weights(path_to_weights)
+print('Model is saved %s' % path_to_weights)
+
+# ================================= PREDICT GOAL SAMPLE =========================================
+
+if path_to_goal_sample:
+    goal_set_name = path_to_goal_sample.split('/')[-1].split('.')[0]
+    goal_res = model.predict_classes(goal)
+    data = pd.read_csv(path_to_goal_sample)['text'].sample(frac=1)
+    data = data.reset_index(drop=True)
+    data = data.tolist()
+    ver_res = [i[0] for i in goal_res]
+    positive = []
+    negative = []
+    pos = open('results/positive_%s_%s.txt' % (goal_set_name, timing), 'w')
+    neg = open('results/negative_%s_%s.txt' % (goal_set_name, timing), 'w')
+    for i in range(len(ver_res)):
+        if goal_res[i] == 0:
+            neg.write('\n==============================================================\n')
+            neg.write('\n')
+            neg.write(data[i])
+            neg.write('\n')
+        else:
+            pos.write('\n==============================================================\n')
+            pos.write('\n')
+            pos.write(data[i])
+            pos.write('\n')
+    pos.close()
+    neg.close()
 
 
 # ====== compute feature importance with LIME ======
@@ -195,32 +224,48 @@ def predict_wrapper(text):
         answer = np.zeros(shape=(1, 2))
         answer[0][0] = model.predict(text)[0][0]
         answer[0][1] = 1 - answer[0][0]
-        print('Probability(class 1) =', answer[0][0])
-        print('True class: %s' % model.predict_classes(text))
+        print('Probability(class 1) = %s, Probability(class 0) = %s\n True class: %s' % (
+            answer[0][0], answer[0][1], model.predict_classes(text)[0][0]))
     if isinstance(text, list):
         answer = np.zeros(shape=(len(text), 2))
         for i in range(len(text)):
             tmp = prepare_sequence(text[i])
-            answer[i][0] = 1 - answer[i][0]           # probability of class 0 (without negative comments)
-            answer[i][1] = model.predict(tmp)[0][0]   # probability of class 1 (with negative comments)
+            answer[i][0] = model.predict(tmp)[0][0]  # probability of class 1 (with negative comments)
+            answer[i][1] = 1 - answer[i][0]  # probability of class 0 (without negative comments)
     return np.array(answer)
 
 
-idx = [6]
-
-print(verification[idx])
-class_names = ['negative', 'positive'] #
+class_names = ['positive', 'negative']  #
 explainer = LimeTextExplainer(class_names=class_names)  # class_names)
+print()
+num_features = 20
+num_samples = 2500
+
 data = pd.read_csv(path_to_goal_sample)
-data = data.processed_text[idx].values.tolist()[0]
-print(predict_wrapper(data))
-exp = explainer.explain_instance(text_instance=data, classifier_fn=predict_wrapper, num_features=15)
-weights = OrderedDict(exp.as_list())
-lime_weights = pd.DataFrame({'words': list(weights.keys()), 'weights': list(weights.values())})
-sns.barplot(x="words", y="weights", data=lime_weights)
-plt.xticks(rotation=45)
-plt.title('Sample {} features weights given by LIME'.format(idx))
-plt.show()
+# data = data.sample(frac=1).reset_index(drop=True)
+
+idx = [143, 103, 3309, 10625, 67, 42, 37, 23, 237, 267, 2002, 2025, 2099, 2140, 13, 140, 137, 2128, 263, 3481, 11696]
+
+train = data.processed_text.tolist()
+texts = data.text.tolist()
+
+for i in idx:
+    tmp = train[i]
+    print()
+    print('====================')
+    print()
+    print(predict_wrapper(tmp))
+    exp = explainer.explain_instance(text_instance=tmp, classifier_fn=predict_wrapper, num_features=num_features,
+                                     num_samples=num_samples)
+    print('[%s]' % i, exp.as_list())
+
+    # TODO: change current behavior - explanations are rewritten now
+    exp.save_to_file('lime_explanations/idx_%s_%s_ver.html' % (i, num_samples))
+    weights = OrderedDict(exp.as_list())
+    lime_weights = pd.DataFrame({'words': list(weights.keys()), 'weights': list(weights.values())})
+    print(list(weights.keys()))
+    print('True text: %s' % texts[i])
+    print()
 
 # ====== END ======
 
@@ -255,30 +300,6 @@ for i in range(len(ver_res)):
 # raw_text = data['raw_text'].tolist()
 # pd.set_option('display.max_colwidth', -1)
 
-if path_to_goal_sample:
-    goal_set_name = path_to_goal_sample.split('/')[-1].split('.')[0]
-    goal_res = model.predict_classes(goal)
-    data = pd.read_csv(path_to_goal_sample)['text'].sample(frac=1)
-    data = data.reset_index(drop=True)
-    data = data.tolist()
-    ver_res = [i[0] for i in goal_res]
-    positive = []
-    negative = []
-    pos = open('results/positive_%s_%s.txt' % (goal_set_name, timing), 'w')
-    neg = open('results/negative_%s_%s.txt' % (goal_set_name, timing), 'w')
-    for i in range(len(ver_res)):
-        if goal_res[i] == 0:
-            neg.write('\n==============================================================\n')
-            neg.write('\n')
-            neg.write(data[i])
-            neg.write('\n')
-        else:
-            pos.write('\n==============================================================\n')
-            pos.write('\n')
-            pos.write(data[i])
-            pos.write('\n')
-    pos.close()
-    neg.close()
 
 # ver_res = model.predict_classes(verification)
 # path_to_verification = verification_name
@@ -303,6 +324,9 @@ if path_to_goal_sample:
 #     print()
 
 # ======================= LOGS =======================
+
+pp = PdfPages('multipage.pdf')
+plt.savefig(pp, format='pdf')
 
 logs_name = 'logs/qrnn/%s.txt' % timing
 
@@ -356,5 +380,3 @@ with open(logs_name, 'w') as f:
 #
 # print('Accuracy:', strike/len(label))
 # print(data)
-
-# 56320/147454 [==========>...................] - ETA: 1:07 - loss: 0.5321 - acc: 0.7312
