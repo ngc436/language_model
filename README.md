@@ -21,35 +21,47 @@ Current repository contains experiments on language modeling for text classifica
 =======================================================================
 - [ ] Prepare test/train/verif sets with less than 10 tokens
 - [x] Check processed comments (reprocess), and other sets
-- [ ] Prepare model with fasttext embeddings (1 - without preprocessing)   
-- [ ] Prepare model with fasttext embeddings (2 - lemmatized)   
-- [ ] Reduce the dictionary and substitute rare words with oov (?)
+- [x] Prepare model with fasttext embeddings (1 - without preprocessing)   
+- [x] Prepare model with fasttext embeddings (2 - lemmatized)   
+- [X] Reduce the dictionary and substitute rare words with oov (?)
 - [ ] Change percentage of positive examples in training set (?)
 - [ ] Tune model with hyperopt
 - [x] Check model_1542229255 on comments with more than 50 tokens
 - [ ] Prepare report on language model
-- [ ] Rewrite to pipeline
+- [ ] Rewrite to normal pipeline
+- [ ] Add representation in latent space from VAE 
 =======================================================================  
 - [x] Try simple bilstm  
-- [x] Find out  what's happening inside of neural network  (in progress)
-- [ ] Try ELMo embeddings  (in progress)
-- [ ] Add context  
+- [x] Find out  what's happening inside of neural network (LIME)
+- [ ] Prepare ELMo embeddings on raw texts (in progress)
+- [ ] Add context (?)  
 =======================================================================  
 More data 
 - [x] Divide on chunks  
 - [x] Add TripAdvisor proocessed comments to train/test
 - [x] Introduce new train/test/ver v5 
-Better data
-- [ ] Change very rare tokens to oov
+Cleaner data  
+- [x] Fix dirty data issue (html, phone instead of id)
 
- ## Datasets
+## List of experiments
+- [ ] BIQRNN fasttext/w2v (time, results, loss plot)
+- [ ] BILSTM fasttext/w2v (time, results, loss plot)
+- [ ] VAE fasttext/w2v (latent space clustering (if possible), create example transition from negative to positive comment)  (time, results, loss plot)
+- [ ] Optimization with hyperopt  
+- [ ] Experiment with ELMo embeddings (not sure how yet (? put directly to input without )) pretrained/fine-tuned (if possible)  
+#### Additional
+- [ ] Look at fasttext work in case of unlemmatized input for the best performing models above (prepare this input) 
+- [ ] Try hierarchical attention network
+
+
+## Datasets
  
  v - dataset version  
  
 * '/mnt/shdstorage/tmp/classif_tmp/X_train_v.csv'
-* '/mnt/shdstorage/tmp/classif_tmp/X_test.csv'
-* '/mnt/shdstorage/tmp/classif_tmp/y_train.csv'
-* '/mnt/shdstorage/tmp/classif_tmp/y_test.csv'
+* '/mnt/shdstorage/tmp/classif_tmp/X_test_v.csv'
+* '/mnt/shdstorage/tmp/classif_tmp/y_train_v.csv'
+* '/mnt/shdstorage/tmp/classif_tmp/y_test_v.csv'
  
 ## Literature
 

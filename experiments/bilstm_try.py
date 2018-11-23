@@ -2,6 +2,7 @@
 
 # /tmp/model.h5,
 import tensorflow as tf
+from collections import OrderedDict
 
 config = tf.ConfigProto()
 config.gpu_options.visible_device_list = "1"
@@ -34,80 +35,60 @@ from metrics import calculate_all_metrics
 
 from keras.preprocessing import sequence
 from keras.models import Sequential, model_from_json
-from keras.layers import Dense, Embedding, SpatialDropout1D, Dropout, Bidirectional, LSTM, GlobalMaxPool1D, TimeDistributed
+from keras.layers import Dense, Embedding, SpatialDropout1D, Dropout, Bidirectional, LSTM, GlobalMaxPool1D
 from keras.regularizers import l2
 from keras.constraints import maxnorm
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from keras import optimizers
 
 import pandas as pd
-from data import prepare_input
-
-# data = pd.read_csv('/mnt/shdstorage/tmp/validation.csv')
-# print(data)
-
-# 89208 tokens
-
+from data import Processor
 
 timing = str(int(time.time()))
 
 batch_size = 128
-# TODO: control the dictionary length
-max_features = 100000 # 291837  # 172567 in the 3rd version # 228654 in the 4th version
-max_len = 100  # reduce
+max_features = 150000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_len = 100
 emb_dim = 300
 
-x_train_set_name = '/mnt/shdstorage/for_classification/X_train_5.csv'
+x_train_set_name = '/mnt/shdstorage/for_classification/X_train_6.csv'
 x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-x_test_set_name = '/mnt/shdstorage/for_classification/X_test_5.csv'
-y_train_labels = '/mnt/shdstorage/for_classification/y_train_5.csv'
-y_test_labels = '/mnt/shdstorage/for_classification/y_test_5.csv'
-
-# x_train_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_train_3.csv'
-# x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-# x_test_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_test_3.csv'
-# y_train_labels = '/mnt/shdstorage/tmp/classif_tmp/y_train_3.csv'
-# y_test_labels = '/mnt/shdstorage/tmp/classif_tmp/y_test_3.csv'
-
-# set new verification
-# verification_name = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
+x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6.csv'
+y_train_labels = '/mnt/shdstorage/for_classification/y_train_6.csv'
+y_test_labels = '/mnt/shdstorage/for_classification/y_test_6.csv'
 
 verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
 path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
-# path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 
 emb_type = 'fasttext_2'
 
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
 y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
-y_train = [y[0] for y in y_train]
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
-y_test = [y[0] for y in y_test]
 
-if path_to_goal_sample:
-    X_train, y_train, X_test, y_test, embedding_matrix, verification, goal = prepare_input(X_train, y_train, X_test,
-                                                                                           y_test,
-                                                                                           max_features=max_features,
-                                                                                           verification_name=verification_name,
-                                                                                           emb_type=emb_type,
-                                                                                           max_len=max_len,
-                                                                                           x_train_name=x_train_name,
-                                                                                           path_to_goal_sample=path_to_goal_sample)
-else:
-    X_train, y_train, X_test, y_test, embedding_matrix, verification = prepare_input(X_train, y_train, X_test, y_test,
-                                                                                     max_features=max_features,
-                                                                                     verification_name=verification_name,
-                                                                                     emb_type=emb_type,
-                                                                                     max_len=max_len,
-                                                                                     x_train_name=x_train_name)
+
+p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len)
+p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name)
+X_train, y_train = p.prepare_input(X_train, y_train)
+X_test, y_test = p.prepare_input(X_test, y_test)
+
+path_to_verification = verification_name
+data = pd.read_csv(path_to_verification)
+texts = data.processed_text.tolist()
+verification = p.prepare_input(texts)
+
+goal = pd.read_csv(path_to_goal_sample)
+texts = goal.processed_text.tolist()
+goal = p.prepare_input(texts)
+
 
 # ======= PARAMS =======
-spatial_dropout = 0.5
+spatial_dropout = 0.2
 window_size = 3
 dropout = 0.5
 recurrent_dropout = 0.5
-units = 150                   # 150
+units = 100
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
@@ -115,9 +96,9 @@ bias_constraint = 6
 loss = 'binary_crossentropy'
 optimizer = 'adam'
 model_type = 'Bidirectional'
-lr = 0.01                     # changed from 0.00001
+lr = 0.001
 clipnorm = None
-epochs = 5  # 20
+epochs = 100
 weights = True
 trainable = False
 previous_weights = None
@@ -129,23 +110,23 @@ print('Build model...')
 model = Sequential()
 
 if weights:
-    model.add(Embedding(max_features, emb_dim, weights=[embedding_matrix], trainable=trainable))
+    model.add(Embedding(max_features, emb_dim, weights=[p.embedding_matrix], trainable=trainable))
 else:
     model.add(Embedding(max_features, emb_dim))
 
-# model.add(SpatialDropout1D(spatial_dropout))
+model.add(SpatialDropout1D(spatial_dropout))
 
 model.add(Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout)))
 # model.add(GlobalMaxPool1D())
 # model.add(Dense(1, activation=activation))
-# if time_distributed:
-#     model.add(TimeDistributed(Dense(1, activation='sigmoid')))
 model.add(Dropout(dropout))
 model.add(Dense(1, activation=activation))
 
 plot_losses = PlotLosses()
-early_stopping = EarlyStopping(monitor='val_loss')
-callbacks_list = [plot_losses, early_stopping]
+#
+# early_stopping = EarlyStopping(monitor='val_loss')
+reduce_lr = ReduceLROnPlateau(monitor='val_loss')
+callbacks_list = [plot_losses, reduce_lr]  # early_stopping]
 
 if clipnorm:
     optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
@@ -162,19 +143,19 @@ print('Loading data...')
 
 # model_1542368228.h5
 
-# print('Train...')
-# previous_weights = "models_dir/model_1542229255.h5"
-# model.load_weights(previous_weights)
+print('Train...')
 
+previous_weights = "models_dir/model_1542892329.h5"
+model.load_weights(previous_weights)
 
-model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
-          callbacks=callbacks_list)
+# model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
+#           callbacks=callbacks_list)
 
 # ================================= MODEL SAVE =========================================
 
-path_to_weights = "models_dir/model_%s.h5" % (timing)
-model.save_weights(path_to_weights)
-print('Model is saved %s' % path_to_weights)
+# path_to_weights = "models_dir/model_%s.h5" % (timing)
+# model.save_weights(path_to_weights)
+# print('Model is saved %s' % path_to_weights)
 
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 
@@ -232,6 +213,9 @@ if path_to_goal_sample:
     pos.close()
     neg.close()
 
+print('results/positive_%s_%s.txt' % (goal_set_name, timing))
+print('results/negative_%s_%s.txt' % (goal_set_name, timing))
+
 # ver_res = model.predict_classes(verification)
 # path_to_verification = verification_name
 # data = pd.read_csv(path_to_verification)
@@ -256,6 +240,67 @@ if path_to_goal_sample:
 
 # ======================= LOGS =======================
 
+
+# ====== compute feature importance with LIME ======
+from lime.lime_text import LimeTextExplainer
+
+
+def predict_wrapper(text):
+    '''
+
+    :param text:
+    :return answer: array of shape = [n_samples, n_classes]
+    '''
+    if isinstance(text, str):
+        text = p.prepare_sequence(text)
+        answer = np.zeros(shape=(1, 2))
+        answer[0][0] = model.predict(text)[0][0]
+        answer[0][1] = 1 - answer[0][0]
+        print('Probability(class 1) = %s, Probability(class 0) = %s\n True class: %s' % (
+            answer[0][0], answer[0][1], model.predict_classes(text)[0][0]))
+    if isinstance(text, list):
+        answer = np.zeros(shape=(len(text), 2))
+        for i in range(len(text)):
+            tmp = p.prepare_sequence(text[i])
+            answer[i][0] = model.predict(tmp)[0][0]  # probability of class 1 (with negative comments)
+            answer[i][1] = 1 - answer[i][0]  # probability of class 0 (without negative comments)
+    return np.array(answer)
+
+
+class_names = ['positive', 'negative']  #
+explainer = LimeTextExplainer(class_names=class_names)  # class_names)
+print()
+num_features = 20
+num_samples = 2500
+
+data = pd.read_csv(path_to_goal_sample)
+# data = data.sample(frac=1).reset_index(drop=True)
+
+idx = [143, 103, 3309, 10625, 67, 42, 37, 23, 237, 267, 2002, 2025, 2099, 2140, 13, 140, 137, 2128, 263, 3481, 11696]
+
+train = data.processed_text.tolist()
+texts = data.text.tolist()
+
+for i in range(len(texts)):
+    tmp = train[i]
+    print()
+    print('====================')
+    print()
+    print(predict_wrapper(tmp))
+    exp = explainer.explain_instance(text_instance=tmp, classifier_fn=predict_wrapper, num_features=num_features,
+                                     num_samples=num_samples)
+    print('[%s]' % i, exp.as_list())
+
+    # TODO: change current behavior - explanations are rewritten now
+    exp.save_to_file('lime_explanations/idx_%s_%s_ver_%s.html' % (i, num_samples, timing))
+    weights = OrderedDict(exp.as_list())
+    lime_weights = pd.DataFrame({'words': list(weights.keys()), 'weights': list(weights.values())})
+    print(list(weights.keys()))
+    print('True text: %s' % texts[i])
+    print()
+
+    print('lime_explanations/idx_%s_%s_ver_%s.html' % (i, num_samples, timing))
+
 logs_name = 'logs/bilstm/%s.txt' % timing
 
 with open(logs_name, 'w') as f:
@@ -269,11 +314,11 @@ with open(logs_name, 'w') as f:
     f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
     if weights:
         f.write('emb_type: %s, emb dim: %s, trainable: %s, time distributed: %s\n' % (
-        emb_type, emb_dim, trainable, time_distributed))
+            emb_type, emb_dim, trainable, time_distributed))
     f.write('batch size: %s, max features: %s, max len: %s\n' % (
         batch_size, max_features, max_len))
     f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
-    window_size, dropout, recurrent_dropout, units, activation))
+        window_size, dropout, recurrent_dropout, units, activation))
     f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
         loss, optimizer, lr, clipnorm, epochs))
     f.write('======= RESULTS =======\n')
@@ -309,3 +354,5 @@ with open(logs_name, 'w') as f:
 # print(data)
 
 # 56320/147454 [==========>...................] - ETA: 1:07 - loss: 0.5321 - acc: 0.7312
+
+# model_1542708525.h5 -> model_1542711790.h5
