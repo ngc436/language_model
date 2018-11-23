@@ -126,9 +126,9 @@ bias_constraint = 6
 loss = 'binary_crossentropy'
 optimizer = 'adam'
 model_type = 'Bidirectional'
-lr = 0.0001  # changed from 0.00001
+lr = 0.00001  # changed from 0.00001
 clipnorm = None
-epochs = 10  # 20
+epochs = 50  # 20
 weights = True
 trainable = True
 previous_weights = None
@@ -260,7 +260,7 @@ for i in idx:
     print('[%s]' % i, exp.as_list())
 
     # TODO: change current behavior - explanations are rewritten now
-    exp.save_to_file('lime_explanations/idx_%s_%s_ver.html' % (i, num_samples))
+    exp.save_to_file('lime_explanations/idx_%s_%s_ver_%s.html' % (i, num_samples, timing))
     weights = OrderedDict(exp.as_list())
     lime_weights = pd.DataFrame({'words': list(weights.keys()), 'weights': list(weights.values())})
     print(list(weights.keys()))

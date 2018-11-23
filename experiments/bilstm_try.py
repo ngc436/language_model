@@ -2,6 +2,7 @@
 
 # /tmp/model.h5,
 import tensorflow as tf
+from collections import OrderedDict
 
 config = tf.ConfigProto()
 config.gpu_options.visible_device_list = "1"
@@ -41,7 +42,7 @@ from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from keras import optimizers
 
 import pandas as pd
-from data import prepare_input
+from data import Processor
 
 timing = str(int(time.time()))
 
@@ -64,26 +65,23 @@ emb_type = 'fasttext_2'
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
 y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
-y_train = [y[0] for y in y_train]
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
-y_test = [y[0] for y in y_test]
 
-if path_to_goal_sample:
-    X_train, y_train, X_test, y_test, embedding_matrix, verification, goal = prepare_input(X_train, y_train, X_test,
-                                                                                           y_test,
-                                                                                           max_features=max_features,
-                                                                                           verification_name=verification_name,
-                                                                                           emb_type=emb_type,
-                                                                                           max_len=max_len,
-                                                                                           x_train_name=x_train_name,
-                                                                                           path_to_goal_sample=path_to_goal_sample)
-else:
-    X_train, y_train, X_test, y_test, embedding_matrix, verification = prepare_input(X_train, y_train, X_test, y_test,
-                                                                                     max_features=max_features,
-                                                                                     verification_name=verification_name,
-                                                                                     emb_type=emb_type,
-                                                                                     max_len=max_len,
-                                                                                     x_train_name=x_train_name)
+
+p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len)
+p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name)
+X_train, y_train = p.prepare_input(X_train, y_train)
+X_test, y_test = p.prepare_input(X_test, y_test)
+
+path_to_verification = verification_name
+data = pd.read_csv(path_to_verification)
+texts = data.processed_text.tolist()
+verification = p.prepare_input(texts)
+
+goal = pd.read_csv(path_to_goal_sample)
+texts = goal.processed_text.tolist()
+goal = p.prepare_input(texts)
+
 
 # ======= PARAMS =======
 spatial_dropout = 0.2
@@ -112,7 +110,7 @@ print('Build model...')
 model = Sequential()
 
 if weights:
-    model.add(Embedding(max_features, emb_dim, weights=[embedding_matrix], trainable=trainable))
+    model.add(Embedding(max_features, emb_dim, weights=[p.embedding_matrix], trainable=trainable))
 else:
     model.add(Embedding(max_features, emb_dim))
 
@@ -146,18 +144,18 @@ print('Loading data...')
 # model_1542368228.h5
 
 print('Train...')
-# previous_weights = "models_dir/model_1542711790.h5"
-# model.load_weights(previous_weights)
 
+previous_weights = "models_dir/model_1542892329.h5"
+model.load_weights(previous_weights)
 
-model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
-          callbacks=callbacks_list)
+# model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
+#           callbacks=callbacks_list)
 
 # ================================= MODEL SAVE =========================================
 
-path_to_weights = "models_dir/model_%s.h5" % (timing)
-model.save_weights(path_to_weights)
-print('Model is saved %s' % path_to_weights)
+# path_to_weights = "models_dir/model_%s.h5" % (timing)
+# model.save_weights(path_to_weights)
+# print('Model is saved %s' % path_to_weights)
 
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 
@@ -215,6 +213,9 @@ if path_to_goal_sample:
     pos.close()
     neg.close()
 
+print('results/positive_%s_%s.txt' % (goal_set_name, timing))
+print('results/negative_%s_%s.txt' % (goal_set_name, timing))
+
 # ver_res = model.predict_classes(verification)
 # path_to_verification = verification_name
 # data = pd.read_csv(path_to_verification)
@@ -238,6 +239,67 @@ if path_to_goal_sample:
 #     print()
 
 # ======================= LOGS =======================
+
+
+# ====== compute feature importance with LIME ======
+from lime.lime_text import LimeTextExplainer
+
+
+def predict_wrapper(text):
+    '''
+
+    :param text:
+    :return answer: array of shape = [n_samples, n_classes]
+    '''
+    if isinstance(text, str):
+        text = p.prepare_sequence(text)
+        answer = np.zeros(shape=(1, 2))
+        answer[0][0] = model.predict(text)[0][0]
+        answer[0][1] = 1 - answer[0][0]
+        print('Probability(class 1) = %s, Probability(class 0) = %s\n True class: %s' % (
+            answer[0][0], answer[0][1], model.predict_classes(text)[0][0]))
+    if isinstance(text, list):
+        answer = np.zeros(shape=(len(text), 2))
+        for i in range(len(text)):
+            tmp = p.prepare_sequence(text[i])
+            answer[i][0] = model.predict(tmp)[0][0]  # probability of class 1 (with negative comments)
+            answer[i][1] = 1 - answer[i][0]  # probability of class 0 (without negative comments)
+    return np.array(answer)
+
+
+class_names = ['positive', 'negative']  #
+explainer = LimeTextExplainer(class_names=class_names)  # class_names)
+print()
+num_features = 20
+num_samples = 2500
+
+data = pd.read_csv(path_to_goal_sample)
+# data = data.sample(frac=1).reset_index(drop=True)
+
+idx = [143, 103, 3309, 10625, 67, 42, 37, 23, 237, 267, 2002, 2025, 2099, 2140, 13, 140, 137, 2128, 263, 3481, 11696]
+
+train = data.processed_text.tolist()
+texts = data.text.tolist()
+
+for i in range(len(texts)):
+    tmp = train[i]
+    print()
+    print('====================')
+    print()
+    print(predict_wrapper(tmp))
+    exp = explainer.explain_instance(text_instance=tmp, classifier_fn=predict_wrapper, num_features=num_features,
+                                     num_samples=num_samples)
+    print('[%s]' % i, exp.as_list())
+
+    # TODO: change current behavior - explanations are rewritten now
+    exp.save_to_file('lime_explanations/idx_%s_%s_ver_%s.html' % (i, num_samples, timing))
+    weights = OrderedDict(exp.as_list())
+    lime_weights = pd.DataFrame({'words': list(weights.keys()), 'weights': list(weights.values())})
+    print(list(weights.keys()))
+    print('True text: %s' % texts[i])
+    print()
+
+    print('lime_explanations/idx_%s_%s_ver_%s.html' % (i, num_samples, timing))
 
 logs_name = 'logs/bilstm/%s.txt' % timing
 

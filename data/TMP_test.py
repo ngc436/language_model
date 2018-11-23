@@ -3,6 +3,11 @@ import pandas as pd
 # verification = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/comments_big.csv')
 # print(len(verification)) # 15270
 
+path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
+data = pd.read_csv(path_to_goal_sample)
+print(data.head())
+raise ValueError
+
 idx = [2, 4, 6, 8, 16, 32, 64, 128, 256, 432, 678, 975]
 
 y_train_labels = '/mnt/shdstorage/for_classification/y_train_5.csv'
