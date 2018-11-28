@@ -2,6 +2,8 @@
 
 import os.path
 import sys
+from ufal.udpipe import Model, Pipeline
+import wget
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -22,9 +24,18 @@ morph = pymorphy2.MorphAnalyzer()
 path_to_model = '/tmp/web_0_300_20.bin'
 # TODO add path to w2v embedding
 path_to_fasttext_emb = '/tmp/wiki.ru.bin'
-path_to_fasttext_emb_2 = '/tmp/ft_native_300_ru_wiki_lenta_lemmatize.bin'
+path_to_fasttext_emb_2 = '/home/gmaster/projects/negRevClassif/data/embeddings/ft_native_300_ru_wiki_lenta_lemmatize.bin'
 path_to_fasttext_unlem = '/tmp/ft_native_300_ru_wiki_lenta_lower_case.bin'
 
+
+# udpipe_model_url = 'http://rusvectores.org/static/models/udpipe_syntagrus.model'
+# udpipe_filename = udpipe_model_url.split('/')[-1]
+# if not os.path.isfile(udpipe_filename):
+#     print('UDPipe model not found. Downloading...', file=sys.stderr)
+# wget.download(udpipe_model_url)
+#
+# print('Loading the model...', file=sys.stderr)
+# model = Model.load(udpipe_filename)
 
 # TODO: check mappings more carefully
 def tag_mappings(tag):
@@ -60,21 +71,31 @@ def embedding(emb_type):
     if emb_type == 'fasttext':
         model = FastText.load_fasttext_format(path_to_fasttext_emb)
     if emb_type == 'fasttext_2':
+        print('loading fasttext embedding...')
         model = FastText.load_fasttext_format(path_to_fasttext_emb_2)
+        print('Done!')
     if emb_type == 'fasttext_unlem':
         model = FastText.load_fasttext_format(path_to_fasttext_unlem)
     return model
+
+
+# def udpipe_tagging(word, text):
+#     pipeline = Pipeline(model, 'tokenize', Pipeline.DEFAULT, Pipeline.DEFAULT, 'conllu')
+#     processed = pipeline.process(text)
+#
+#     raise NotImplementedError
 
 
 # class Input
 # this class can eat set or one instance of text
 class Processor:
 
-    def __init__(self, max_features, emb_type, max_len):
+    def __init__(self, max_features, emb_type, max_len, emb_dim=300):
         self.tokenizer = None
         self.max_features = max_features
         self.emb_type = emb_type
         self.model = None
+        self.emb_dim = emb_dim
         self.embedding_matrix = None
         self.x_train_name = None
         self.max_len = max_len
@@ -117,26 +138,26 @@ class Processor:
                     self.emb_type, x_train_name, self.max_features), 'rb') as handle:
                 self.tokenizer = pickle.load(handle)
             return 0
-        # not found exception
 
-        except IOError:  # to check
+        # not found exception
+        except:  # to check
+            print('No model found...initialization...')
             x_train = [sent[0] for sent in x_train]
             x_test = [sent[0] for sent in x_test]
-            tokenizer = Tokenizer(num_words=self.max_features + 1, oov_token='oov')
-            tokenizer.fit_on_texts(x_train + x_test)
-
+            self.tokenizer = Tokenizer(num_words=self.max_features + 1, oov_token='oov')
+            self.tokenizer.fit_on_texts(x_train + x_test)
             # hopefully this staff helps to avoid issues with oov (NOT SURE needs to be checked)
-            tokenizer.word_index = {e: i for e, i in tokenizer.word_index.items() if i <= self.max_features}
-            tokenizer.word_index[tokenizer.oov_token] = self.max_features + 1
-            word_index = tokenizer.word_index
-
+            self.tokenizer.word_index = {e: i for e, i in self.tokenizer.word_index.items() if i <= self.max_features}
+            self.tokenizer.word_index[self.tokenizer.oov_token] = self.max_features + 1
+            word_index = self.tokenizer.word_index
             with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
                     self.emb_type, x_train_name, self.max_features), 'wb') as handle:
-                pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(self.tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
             # ======================== write tokenizer to file ===================================
 
             print('Amount of unique tokens %s' % len(word_index))
+
             self.model = embedding(self.emb_type)
             self.embedding_matrix = self.prepare_embedding_matrix(word_index, x_train_name)
 

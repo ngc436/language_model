@@ -47,15 +47,15 @@ from data import Processor
 timing = str(int(time.time()))
 
 batch_size = 128
-max_features = 150000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 200000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100
 emb_dim = 300
 
-x_train_set_name = '/mnt/shdstorage/for_classification/X_train_6.csv'
+x_train_set_name = '/mnt/shdstorage/for_classification/X_train_6_no_ent.csv'
 x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6.csv'
-y_train_labels = '/mnt/shdstorage/for_classification/y_train_6.csv'
-y_test_labels = '/mnt/shdstorage/for_classification/y_test_6.csv'
+x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6_no_ent.csv'
+y_train_labels = '/mnt/shdstorage/for_classification/y_train_6_no_ent.csv'
+y_test_labels = '/mnt/shdstorage/for_classification/y_test_6_no_ent.csv'
 
 verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
 path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
@@ -68,18 +68,20 @@ y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 
 
-p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len)
+p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
 p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name)
 X_train, y_train = p.prepare_input(X_train, y_train)
+print('Train params: ', len(X_train), len(y_train))
 X_test, y_test = p.prepare_input(X_test, y_test)
+print('Test params: ', len(X_test), len(y_test))
 
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
-texts = data.processed_text.tolist()
+texts = data.new_processed.tolist()
 verification = p.prepare_input(texts)
 
 goal = pd.read_csv(path_to_goal_sample)
-texts = goal.processed_text.tolist()
+texts = goal.new_processed.tolist()
 goal = p.prepare_input(texts)
 
 
@@ -88,7 +90,7 @@ spatial_dropout = 0.2
 window_size = 3
 dropout = 0.5
 recurrent_dropout = 0.5
-units = 100
+units = 300
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
@@ -98,7 +100,7 @@ optimizer = 'adam'
 model_type = 'Bidirectional'
 lr = 0.001
 clipnorm = None
-epochs = 100
+epochs = 50
 weights = True
 trainable = False
 previous_weights = None
@@ -119,6 +121,7 @@ model.add(SpatialDropout1D(spatial_dropout))
 model.add(Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout)))
 # model.add(GlobalMaxPool1D())
 # model.add(Dense(1, activation=activation))
+# TODO: Add batch normalization
 model.add(Dropout(dropout))
 model.add(Dense(1, activation=activation))
 
@@ -145,17 +148,17 @@ print('Loading data...')
 
 print('Train...')
 
-previous_weights = "models_dir/model_1542892329.h5"
-model.load_weights(previous_weights)
+# previous_weights = "models_dir/model_1542892329.h5"
+# model.load_weights(previous_weights)
 
-# model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
-#           callbacks=callbacks_list)
+model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
+          callbacks=callbacks_list)
 
 # ================================= MODEL SAVE =========================================
 
-# path_to_weights = "models_dir/model_%s.h5" % (timing)
-# model.save_weights(path_to_weights)
-# print('Model is saved %s' % path_to_weights)
+path_to_weights = "models_dir/model_%s.h5" % (timing)
+model.save_weights(path_to_weights)
+print('Model is saved %s' % path_to_weights)
 
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 
@@ -184,9 +187,9 @@ for i in range(len(ver_res)):
     if ver_res[i] == 1 and label[i] == 1:
         true_positive.append(i)
 
-# text = data['text'].tolist()
-# raw_text = data['raw_text'].tolist()
-# pd.set_option('display.max_colwidth', -1)
+text = data['text'].tolist()
+raw_text = data['raw_text'].tolist()
+pd.set_option('display.max_colwidth', -1)
 
 if path_to_goal_sample:
     goal_set_name = path_to_goal_sample.split('/')[-1].split('.')[0]
@@ -278,7 +281,7 @@ data = pd.read_csv(path_to_goal_sample)
 
 idx = [143, 103, 3309, 10625, 67, 42, 37, 23, 237, 267, 2002, 2025, 2099, 2140, 13, 140, 137, 2128, 263, 3481, 11696]
 
-train = data.processed_text.tolist()
+train = data.processed_text_no_org.tolist()
 texts = data.text.tolist()
 
 for i in range(len(texts)):
@@ -298,7 +301,6 @@ for i in range(len(texts)):
     print(list(weights.keys()))
     print('True text: %s' % texts[i])
     print()
-
     print('lime_explanations/idx_%s_%s_ver_%s.html' % (i, num_samples, timing))
 
 logs_name = 'logs/bilstm/%s.txt' % timing
