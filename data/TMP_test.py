@@ -1,10 +1,20 @@
 import pandas as pd
+import deeppavlov
+
+from deeppavlov.models.embedders.elmo_embedder import ELMoEmbedder
+
+elmo = ELMoEmbedder()
 
 # verification = pd.read_csv('/mnt/shdstorage/tmp/classif_tmp/comments_big.csv')
 # print(len(verification)) # 15270
+previous_weights = "models_dir/model_1542892329.h5"
+timing = previous_weights.split('/')[-1].split('_')[-1].split('.')[0]
+print(timing)
 
-path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
-data = pd.read_csv(path_to_goal_sample)
+verification_name = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
+path_to_verification = verification_name
+data = pd.read_csv(path_to_verification)
+
 print(data.head())
 raise ValueError
 

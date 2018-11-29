@@ -4,6 +4,7 @@ import os.path
 import sys
 from ufal.udpipe import Model, Pipeline
 import wget
+import keras
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -87,7 +88,7 @@ def embedding(emb_type):
 
 
 # class Input
-# this class can eat set or one instance of text
+# this class can eat set or one instance of text (prepare_sequence)
 class Processor:
 
     def __init__(self, max_features, emb_type, max_len, emb_dim=300):
@@ -180,3 +181,17 @@ class Processor:
         sequences = self.tokenizer.texts_to_sequences(text)
         x = pad_sequences(sequences, maxlen=self.max_len)
         return x
+
+
+class DataGenerator(keras.utils.Sequence):
+
+    def __init__(self, ids_list, dim=(32, 32, 32), batch_size=32):
+        self.dim = dim
+        self.ids_list = ids_list
+        self.batch_size = batch_size
+
+    def __len__(self):
+        return int(np.floor(len(self.ids_list) / self.batch_size))
+
+    def __data_generation(self, index):
+        max_iter = min(self.batch_size, len(self.x)-self.batch_size*index)

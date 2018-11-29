@@ -21,7 +21,7 @@ x_test_set_name = '/mnt/shdstorage/for_classification/X_test_4.csv'
 y_train_labels = '/mnt/shdstorage/for_classification/y_train_4.csv'
 y_test_labels = '/mnt/shdstorage/for_classification/y_test_4.csv'
 
-class Neural_pipeline:
+class BaseModel:
 
     def __init__(self, max_features=100000, max_len=90, embedding_dim=300, batch_size=64,
                  emb_matrix=None):
@@ -32,13 +32,12 @@ class Neural_pipeline:
         self.max_len = max_len
         self.embedding_dim = embedding_dim
         self.emb_matrix = emb_matrix
-
         self.model_type = None
-
         self.X_train = None
         self.y_train = None
 
-    def _prepare_data(self):
+
+    def prepare_data(self):
 
         X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
         X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
@@ -63,7 +62,7 @@ class Neural_pipeline:
 
 
 
-class QRNN_model:
+class BiQrnnModel(BaseModel):
 
     def __init__(self, max_features=100000, max_len=90, embedding_dim=300, batch_size=64,
                  emb_matrix=None):
@@ -93,3 +92,8 @@ class QRNN_model:
 
     def fit(self):
         print()
+
+class BiLstmModel(BaseModel):
+
+    def __init__(self):
+        super().__init__()

@@ -1,49 +1,46 @@
 # TODO: save matrix of latent representation
 
+import pickle
 import tensorflow as tf
-
-config = tf.ConfigProto()
-config.gpu_options.visible_device_list = "0"
-config.gpu_options.per_process_gpu_memory_fraction = 0.4
-config.allow_soft_placement = True
-config.gpu_options.allow_growth = True
-session = tf.Session(config=config)
-
-# config = tf.ConfigProto(
-#     device_count={'GPU': 0}
-# )
-# session = tf.Session(config=config)
-# set_session(session)
-#
 from keras.backend.tensorflow_backend import set_session
 
-#
+# config = tf.ConfigProto()
+# config.gpu_options.visible_device_list = "0"
+# config.gpu_options.per_process_gpu_memory_fraction = 0.4
+# config.allow_soft_placement = True
+# config.gpu_options.allow_growth = True
+# session = tf.Session(config=config)
+
+config = tf.ConfigProto(
+    device_count={'GPU': 0}
+)
+session = tf.Session(config=config)
 set_session(session)
+#
+
+#
 
 import numpy as np
 from vis_tools import *
 
-from keras.models import Sequential
-from keras.regularizers import l2
-from keras.layers import Dense, Activation, Embedding, SpatialDropout1D, Bidirectional, \
+from keras.layers import Dense, Embedding, Bidirectional, \
     Input, LSTM, Dropout, Lambda, RepeatVector, TimeDistributed, Layer
 from keras.constraints import maxnorm
 from keras.layers.advanced_activations import ELU
 import keras.backend as K
-from keras.backend import clear_session
 from keras.models import Model
 from keras.optimizers import Adam
 
 import pandas as pd
-from data import prepare_input
+from data import Processor
 
 print('Build model...')
 
 # ======= PARAMS =======
-batch_size = 32
-max_features = 273046  # 172567
+batch_size = 128
+max_features = 221952  # 172567 # 233382
 latent_dim = 200
-max_len = 80  # reduce
+max_len = 100  # reduce
 emb_dim = 300
 int_dim = 96
 recurrent_dropout = 0.2
@@ -57,7 +54,7 @@ kernel_constraint = maxnorm(10)
 bias_constraint = maxnorm(10)
 loss = 'binary_crossentropy'
 optimizer = 'adam'
-epochs = 10
+epochs = 1
 weights = True
 trainable = False
 
@@ -66,11 +63,11 @@ act = ELU()
 
 # ======= DATASETS =======
 
-x_train_set_name = '/mnt/shdstorage/for_classification/X_train_5.csv'
+x_train_set_name = '/mnt/shdstorage/for_classification/X_train_6.csv'
 x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-x_test_set_name = '/mnt/shdstorage/for_classification/X_test_5.csv'
-y_train_labels = '/mnt/shdstorage/for_classification/y_train_5.csv'
-y_test_labels = '/mnt/shdstorage/for_classification/y_test_5.csv'
+x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6.csv'
+y_train_labels = '/mnt/shdstorage/for_classification/y_train_6.csv'
+y_test_labels = '/mnt/shdstorage/for_classification/y_test_6.csv'
 
 emb_type = 'fasttext_2'
 
@@ -78,29 +75,25 @@ verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
 path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
 
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
-x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
 y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
-y_train = [y[0] for y in y_train]
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
-y_test = [y[0] for y in y_test]
 
-if path_to_goal_sample:
-    X_train, y_train, X_test, y_test, embedding_matrix, verification, goal = prepare_input(X_train, y_train, X_test,
-                                                                                           y_test,
-                                                                                           max_features=max_features,
-                                                                                           verification_name=verification_name,
-                                                                                           emb_type=emb_type,
-                                                                                           max_len=max_len,
-                                                                                           x_train_name=x_train_name,
-                                                                                           path_to_goal_sample=path_to_goal_sample)
-else:
-    X_train, y_train, X_test, y_test, embedding_matrix, verification = prepare_input(X_train, y_train, X_test, y_test,
-                                                                                     max_features=max_features,
-                                                                                     verification_name=verification_name,
-                                                                                     emb_type=emb_type,
-                                                                                     max_len=max_len,
-                                                                                     x_train_name=x_train_name)
+p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
+p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name)
+X_train, y_train = p.prepare_input(X_train, y_train)
+print('Train params: ', len(X_train), len(y_train))
+X_test, y_test = p.prepare_input(X_test, y_test)
+print('Test params: ', len(X_test), len(y_test))
+
+path_to_verification = verification_name
+data = pd.read_csv(path_to_verification)
+texts = data.new_processed.tolist()
+verification = p.prepare_input(texts)
+
+goal = pd.read_csv(path_to_goal_sample)
+texts = goal.new_processed.tolist()
+goal = p.prepare_input(texts)
 
 tmp = int((len(X_train)) / batch_size) * batch_size
 X_train = X_train[:tmp]
@@ -111,7 +104,7 @@ X_test = X_test[:tmp]
 x = Input(batch_shape=(None, max_len))
 
 if weights:
-    embedding = Embedding(max_features, emb_dim, weights=[embedding_matrix], trainable=trainable)(x)
+    embedding = Embedding(max_features, emb_dim, weights=[p.embedding_matrix], trainable=trainable)(x)
 else:
     embedding = Embedding(max_features, emb_dim)(x)
 
@@ -185,33 +178,53 @@ _h_decoded = decoder_h(decoder_input)
 _x_decoded_mean = decoder_mean(_h_decoded)
 generator = Model(decoder_input, _x_decoded_mean)
 
+
 # input: two points, integer n
 # output: n equidistant points on the line between the input points (inclusive)
 def shortest_homology(point_one, point_two, num):
     dist_vec = point_two - point_one
-    sample = np.linspace(0, 1, num, endpoint = True)
+    sample = np.linspace(0, 1, num, endpoint=True)
     hom_sample = []
     for s in sample:
         hom_sample.append(point_one + s * dist_vec)
     return hom_sample
 
+
 def print_sentence(sentence_vect):
     # TODO: high need in fasttext model
     sentence = ''
+    tocut = sentence_vect
+    for i in range(int(len(sentence_vect) / emb_dim)):
+        sentence += p.model.most_similar(positive=[tocut[:emb_dim]], topn=1)[0][0]
+        sentence += ' '
+        tocut = tocut[emb_dim:]
+    print(sentence)
 
 
 def sentence_variation(sentence_1, sentence_2, batch, dim):
     # TODO: prepare sentences
-    # sentence_1 = sentence_1...
-    # sentence_2 = sentence_2...
+    sentence_1 = p.prepare_sequence(sentence_1)
+    sentence_2 = p.prepare_sequence(sentence_2)
+
     encode_1 = encoder.predict(sentence_1, batch_size=batch)
     encode_2 = encoder.predict(sentence_2, batch_size=batch)
-    test_hom =  shortest_homology(encode_1[0], encode_2[0], 5)
+    test_hom = shortest_homology(encode_1[0], encode_2[0], 5)
 
     for point in test_hom:
         p = generator.predict(np.array([point]))[0]
         print_sentence(p)
 
 
+sent_encoded = encoder.predict(X_train, batch_size=batch_size)
+with open('/home/gmaster/projects/negRevClassif/data/embeddings/VAE_latent_%s_%s_%s.pickle' % (
+        emb_type, x_train_name, max_features), 'wb') as handle:
+    pickle.dump(sent_encoded, handle, protocol=pickle.HIGHEST_PROTOCOL)
+print(sent_encoded)
+
+sent_decoded = generator.predict(sent_encoded)
+
+# save models
+
+# TODO: return latent representation and try to solve classification problem
 
 # get latent representation

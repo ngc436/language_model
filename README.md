@@ -54,6 +54,11 @@ Cleaner data
 - [ ] Look at fasttext work in case of unlemmatized input for the best performing models above (prepare this input) 
 - [ ] Try hierarchical attention network
 - [ ] Create new verification with 500 samples (50 positive, other - negative)
+- [ ] Look at the distribution how length depends on the wrong/right classification result
+- [ ] Change fit to fit generator + add batches generation
+
+##Notes
+- most of the examples in test set (15 samples from vk group with negative comments) were misclassified due to the ORG tag  
 
 
 ## Datasets
