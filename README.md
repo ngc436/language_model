@@ -18,6 +18,7 @@ Current repository contains experiments on language modeling for text classifica
 - [x] Find out why loss becomes NaN in QRNN (too high learning rate)
 - [ ] Preprocess embedding data to zero mean and unit variance  
 - [x] Check on models_dir/model_1542027692.h5 weights (w2v embedding)  
+- [ ] Add cross-validation
 =======================================================================
 - [ ] Prepare test/train/verif sets with less than 10 tokens
 - [x] Check processed comments (reprocess), and other sets
@@ -52,6 +53,12 @@ Cleaner data
 #### Additional
 - [ ] Look at fasttext work in case of unlemmatized input for the best performing models above (prepare this input) 
 - [ ] Try hierarchical attention network
+- [ ] Create new verification with 500 samples (50 positive, other - negative)
+- [ ] Look at the distribution how length depends on the wrong/right classification result
+- [ ] Change fit to fit generator + add batches generation
+
+##Notes
+- most of the examples in test set (15 samples from vk group with negative comments) were misclassified due to the ORG tag  
 
 
 ## Datasets

@@ -2,7 +2,6 @@
 
 # /tmp/model.h5,
 import tensorflow as tf
-from collections import OrderedDict
 
 config = tf.ConfigProto()
 config.gpu_options.visible_device_list = "1"
@@ -47,18 +46,23 @@ from data import Processor
 timing = str(int(time.time()))
 
 batch_size = 128
-max_features = 150000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+# cut words with 1, 2 appearances
+# 61502 in version with no ent
+# 123004 in cut version without entities
+max_features = 200000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100
 emb_dim = 300
 
-x_train_set_name = '/mnt/shdstorage/for_classification/X_train_6.csv'
+x_train_set_name = '/mnt/shdstorage/for_classification/X_train_6_no_ent.csv'
 x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6.csv'
-y_train_labels = '/mnt/shdstorage/for_classification/y_train_6.csv'
-y_test_labels = '/mnt/shdstorage/for_classification/y_test_6.csv'
+x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6_no_ent.csv'
+y_train_labels = '/mnt/shdstorage/for_classification/y_train_6_no_ent.csv'
+y_test_labels = '/mnt/shdstorage/for_classification/y_test_6_no_ent.csv'
 
 verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
-path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
+path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
+# file:///mnt/shdstorage/tmp/classif_tmp/comments_big_unlem.csv
+#
 
 emb_type = 'fasttext_2'
 
@@ -67,28 +71,28 @@ X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
 y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 
-
-p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len)
+p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
 p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name)
 X_train, y_train = p.prepare_input(X_train, y_train)
+print('Train params: ', len(X_train), len(y_train))
 X_test, y_test = p.prepare_input(X_test, y_test)
+print('Test params: ', len(X_test), len(y_test))
 
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
-texts = data.processed_text.tolist()
+texts = data.new_processed.tolist()
 verification = p.prepare_input(texts)
 
 goal = pd.read_csv(path_to_goal_sample)
 texts = goal.processed_text.tolist()
 goal = p.prepare_input(texts)
 
-
 # ======= PARAMS =======
-spatial_dropout = 0.2
+spatial_dropout = None
 window_size = 3
-dropout = 0.5
+dropout = 0.7
 recurrent_dropout = 0.5
-units = 100
+units = 300
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
@@ -98,7 +102,7 @@ optimizer = 'adam'
 model_type = 'Bidirectional'
 lr = 0.001
 clipnorm = None
-epochs = 100
+epochs = 50
 weights = True
 trainable = False
 previous_weights = None
@@ -114,11 +118,12 @@ if weights:
 else:
     model.add(Embedding(max_features, emb_dim))
 
-model.add(SpatialDropout1D(spatial_dropout))
+# model.add(SpatialDropout1D(spatial_dropout))
 
 model.add(Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout)))
 # model.add(GlobalMaxPool1D())
 # model.add(Dense(1, activation=activation))
+# TODO: Add batch normalization
 model.add(Dropout(dropout))
 model.add(Dense(1, activation=activation))
 
@@ -141,21 +146,23 @@ print(model.summary())
 
 print('Loading data...')
 
-# model_1542368228.h5
-
-print('Train...')
-
-previous_weights = "models_dir/model_1542892329.h5"
+previous_weights = "models_dir/model_1543408507.h5"
 model.load_weights(previous_weights)
 
-# model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
-#           callbacks=callbacks_list)
+fit = False
+if fit:
+    print('Train...')
+    model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
+              callbacks=callbacks_list)
 
-# ================================= MODEL SAVE =========================================
+    # ================================= MODEL SAVE =========================================
 
-# path_to_weights = "models_dir/model_%s.h5" % (timing)
-# model.save_weights(path_to_weights)
-# print('Model is saved %s' % path_to_weights)
+    path_to_weights = "models_dir/model_%s.h5" % (timing)
+    model.save_weights(path_to_weights)
+    print('Model is saved %s' % path_to_weights)
+
+else:
+    timing = previous_weights.split('/')[-1].split('_')[-1].split('.')[0]
 
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 
@@ -184,10 +191,39 @@ for i in range(len(ver_res)):
     if ver_res[i] == 1 and label[i] == 1:
         true_positive.append(i)
 
-# text = data['text'].tolist()
-# raw_text = data['raw_text'].tolist()
-# pd.set_option('display.max_colwidth', -1)
+# ======================= LOGS =======================
 
+logs_name = 'logs/bilstm/%s.txt' % timing
+
+with open(logs_name, 'w') as f:
+    f.write('======= DATASETS =======\n')
+    f.write('Train set data: %s\n' % x_train_set_name)
+    f.write('Test set data: %s\n' % x_test_set_name)
+    f.write('Train labels: %s\n' % y_train_labels)
+    f.write('Test labels: %s\n' % y_test_labels)
+    f.write('Verification data: %s\n' % verification_name)
+    f.write('======= MODEL PARAMS =======\n')
+    f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
+    if weights:
+        f.write('emb_type: %s, emb dim: %s, trainable: %s, time distributed: %s\n' % (
+            emb_type, emb_dim, trainable, time_distributed))
+    f.write('batch size: %s, max features: %s, max len: %s\n' % (
+        batch_size, max_features, max_len))
+    f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
+        window_size, dropout, recurrent_dropout, units, activation))
+    f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
+        loss, optimizer, lr, clipnorm, epochs))
+    f.write('======= RESULTS =======\n')
+    f.write(train_1 + '\n')
+    f.write(train_0 + '\n')
+    f.write(test_1 + '\n')
+    f.write(test_0 + '\n')
+    f.write(verif_1 + '\n')
+    f.write(verif_0 + '\n')
+    f.write('model weights: %s' % path_to_weights + '\n')
+
+
+# ====================== PROCESSING TEST ============================
 if path_to_goal_sample:
     goal_set_name = path_to_goal_sample.split('/')[-1].split('.')[0]
     goal_res = model.predict_classes(goal)
@@ -195,8 +231,8 @@ if path_to_goal_sample:
     data = data.reset_index(drop=True)
     data = data.tolist()
     ver_res = [i[0] for i in goal_res]
-    positive = []
-    negative = []
+    positive_counter = 0
+    negative_counter = 0
     pos = open('results/positive_%s_%s.txt' % (goal_set_name, timing), 'w')
     neg = open('results/negative_%s_%s.txt' % (goal_set_name, timing), 'w')
     for i in range(len(ver_res)):
@@ -238,8 +274,8 @@ print('results/negative_%s_%s.txt' % (goal_set_name, timing))
 #     print(raw_text[i])
 #     print()
 
-# ======================= LOGS =======================
 
+raise ValueError
 
 # ====== compute feature importance with LIME ======
 from lime.lime_text import LimeTextExplainer
@@ -278,7 +314,7 @@ data = pd.read_csv(path_to_goal_sample)
 
 idx = [143, 103, 3309, 10625, 67, 42, 37, 23, 237, 267, 2002, 2025, 2099, 2140, 13, 140, 137, 2128, 263, 3481, 11696]
 
-train = data.processed_text.tolist()
+train = data.processed_text_no_org.tolist()
 texts = data.text.tolist()
 
 for i in range(len(texts)):
@@ -298,37 +334,7 @@ for i in range(len(texts)):
     print(list(weights.keys()))
     print('True text: %s' % texts[i])
     print()
-
     print('lime_explanations/idx_%s_%s_ver_%s.html' % (i, num_samples, timing))
-
-logs_name = 'logs/bilstm/%s.txt' % timing
-
-with open(logs_name, 'w') as f:
-    f.write('======= DATASETS =======\n')
-    f.write('Train set data: %s\n' % x_train_set_name)
-    f.write('Test set data: %s\n' % x_test_set_name)
-    f.write('Train labels: %s\n' % y_train_labels)
-    f.write('Test labels: %s\n' % y_test_labels)
-    f.write('Verification data: %s\n' % verification_name)
-    f.write('======= MODEL PARAMS =======\n')
-    f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
-    if weights:
-        f.write('emb_type: %s, emb dim: %s, trainable: %s, time distributed: %s\n' % (
-            emb_type, emb_dim, trainable, time_distributed))
-    f.write('batch size: %s, max features: %s, max len: %s\n' % (
-        batch_size, max_features, max_len))
-    f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
-        window_size, dropout, recurrent_dropout, units, activation))
-    f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
-        loss, optimizer, lr, clipnorm, epochs))
-    f.write('======= RESULTS =======\n')
-    f.write(train_1 + '\n')
-    f.write(train_0 + '\n')
-    f.write(test_1 + '\n')
-    f.write(test_0 + '\n')
-    f.write(verif_1 + '\n')
-    f.write(verif_0 + '\n')
-    f.write('model weights: %s' % path_to_weights + '\n')
 
 # strike = 0
 # positive_negative = 0
@@ -356,3 +362,7 @@ with open(logs_name, 'w') as f:
 # 56320/147454 [==========>...................] - ETA: 1:07 - loss: 0.5321 - acc: 0.7312
 
 # model_1542708525.h5 -> model_1542711790.h5
+
+# models_dir/model_1543411674.h5
+
+# model_1543408507.h5

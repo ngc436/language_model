@@ -47,7 +47,7 @@ from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from keras import optimizers
 
 import pandas as pd
-from data import prepare_input, prepare_sequence
+from data import Processor
 
 from collections import OrderedDict
 import matplotlib.pyplot as plt
@@ -76,15 +76,6 @@ x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6.csv'
 y_train_labels = '/mnt/shdstorage/for_classification/y_train_6.csv'
 y_test_labels = '/mnt/shdstorage/for_classification/y_test_6.csv'
 
-# x_train_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_train_3.csv'
-# x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-# x_test_set_name = '/mnt/shdstorage/tmp/classif_tmp/X_test_3.csv'
-# y_train_labels = '/mnt/shdstorage/tmp/classif_tmp/y_train_3.csv'
-# y_test_labels = '/mnt/shdstorage/tmp/classif_tmp/y_test_3.csv'
-
-# set new verification
-# verification_name = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
-
 verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
 # path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
 path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
@@ -94,26 +85,27 @@ emb_type = 'fasttext_2'
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
 y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
-y_train = [y[0] for y in y_train]
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
-y_test = [y[0] for y in y_test]
 
-if path_to_goal_sample:
-    X_train, y_train, X_test, y_test, embedding_matrix, verification, goal = prepare_input(X_train, y_train, X_test,
-                                                                                           y_test,
-                                                                                           max_features=max_features,
-                                                                                           verification_name=verification_name,
-                                                                                           emb_type=emb_type,
-                                                                                           max_len=max_len,
-                                                                                           x_train_name=x_train_name,
-                                                                                           path_to_goal_sample=path_to_goal_sample)
-else:
-    X_train, y_train, X_test, y_test, embedding_matrix, verification = prepare_input(X_train, y_train, X_test, y_test,
-                                                                                     max_features=max_features,
-                                                                                     verification_name=verification_name,
-                                                                                     emb_type=emb_type,
-                                                                                     max_len=max_len,
-                                                                                     x_train_name=x_train_name)
+X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
+X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
+y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
+y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
+
+
+p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len)
+p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name)
+X_train, y_train = p.prepare_input(X_train, y_train)
+X_test, y_test = p.prepare_input(X_test, y_test)
+
+path_to_verification = verification_name
+data = pd.read_csv(path_to_verification)
+texts = data.processed_text.tolist()
+verification = p.prepare_input(texts)
+
+goal = pd.read_csv(path_to_goal_sample)
+texts = goal.processed_text.tolist()
+goal = p.prepare_input(texts)
 
 # ======= PARAMS =======
 spatial_dropout = 0.4
@@ -139,7 +131,7 @@ print('Build model...')
 model = Sequential()
 
 if weights:
-    model.add(Embedding(max_features, emb_dim, weights=[embedding_matrix], trainable=trainable))
+    model.add(Embedding(max_features, emb_dim, weights=[p.embedding_matrix], trainable=trainable))
 else:
     model.add(Embedding(max_features, emb_dim))
 
@@ -170,8 +162,8 @@ print('Loading data...')
 
 print('Train...')
 
-# previous_weights = "models_dir/model_1542372842.h5"
-# model.load_weights(previous_weights)
+previous_weights = "models_dir/model_1542979324.h5"
+model.load_weights(previous_weights)
 
 
 model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
@@ -220,7 +212,7 @@ def predict_wrapper(text):
     :return answer: array of shape = [n_samples, n_classes]
     '''
     if isinstance(text, str):
-        text = prepare_sequence(text)
+        text = p.prepare_sequence(text)
         answer = np.zeros(shape=(1, 2))
         answer[0][0] = model.predict(text)[0][0]
         answer[0][1] = 1 - answer[0][0]
@@ -229,7 +221,7 @@ def predict_wrapper(text):
     if isinstance(text, list):
         answer = np.zeros(shape=(len(text), 2))
         for i in range(len(text)):
-            tmp = prepare_sequence(text[i])
+            tmp = p.prepare_sequence(text[i])
             answer[i][0] = model.predict(tmp)[0][0]  # probability of class 1 (with negative comments)
             answer[i][1] = 1 - answer[i][0]  # probability of class 0 (without negative comments)
     return np.array(answer)
@@ -380,3 +372,5 @@ with open(logs_name, 'w') as f:
 #
 # print('Accuracy:', strike/len(label))
 # print(data)
+
+# model_1542979324
