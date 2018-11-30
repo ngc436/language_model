@@ -1,17 +1,25 @@
-# TODO: perform optimization with hyperopt with text accuracy maximization
+# Other staff:
+# layer normalization: https://gist.github.com/udibr/7f46e790c9e342d75dcbd9b1deb9d940
+
+# to use word dropout
+# from language_model import TimestepDropout
+# word_embeddings = Embedding() # first map to embeddings
+# word_embeddings = TimestepDropout(0.10)(word_embeddings) # then zero-out word embeddings
+# word_embeddings = SpatialDropout1D(0.50)(word_embeddings) # and possibly drop some dimensions on every single embedding (timestep)
+
 
 # /tmp/model.h5,
 import tensorflow as tf
 
 config = tf.ConfigProto()
-config.gpu_options.visible_device_list = "1"
+config.gpu_options.visible_device_list = "0"
 # config.gpu_options.per_process_gpu_memory_fraction = 0.4
 config.allow_soft_placement = True
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from keras.backend.tensorflow_backend import set_session
-
+from collections import OrderedDict
 #
 set_session(session)
 
@@ -34,7 +42,8 @@ from metrics import calculate_all_metrics
 
 from keras.preprocessing import sequence
 from keras.models import Sequential, model_from_json
-from keras.layers import Dense, Embedding, SpatialDropout1D, Dropout, Bidirectional, LSTM, GlobalMaxPool1D
+from keras.layers import Dense, Embedding, SpatialDropout1D, Dropout, Bidirectional, LSTM, GlobalMaxPool1D, \
+    BatchNormalization
 from keras.regularizers import l2
 from keras.constraints import maxnorm
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau
@@ -45,11 +54,11 @@ from data import Processor
 
 timing = str(int(time.time()))
 
-batch_size = 128
+batch_size = 64
 # cut words with 1, 2 appearances
 # 61502 in version with no ent
 # 123004 in cut version without entities
-max_features = 200000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 300000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100
 emb_dim = 300
 
@@ -58,9 +67,12 @@ x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
 x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6_no_ent.csv'
 y_train_labels = '/mnt/shdstorage/for_classification/y_train_6_no_ent.csv'
 y_test_labels = '/mnt/shdstorage/for_classification/y_test_6_no_ent.csv'
+path_to_goal_sample = None
 
-verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
-path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
+verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
+# verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
+# path_to_goal_sample = '/mnt/shdstorage/for_classification/new_test.csv'
+# path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 # file:///mnt/shdstorage/tmp/classif_tmp/comments_big_unlem.csv
 #
 
@@ -71,24 +83,27 @@ X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
 y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 
+path_to_verification = verification_name
+data = pd.read_csv(path_to_verification)
+texts = data.processed_text_no_tags.tolist()
+
 p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
-p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name)
+p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name, other=texts)
 X_train, y_train = p.prepare_input(X_train, y_train)
 print('Train params: ', len(X_train), len(y_train))
 X_test, y_test = p.prepare_input(X_test, y_test)
 print('Test params: ', len(X_test), len(y_test))
 
-path_to_verification = verification_name
-data = pd.read_csv(path_to_verification)
-texts = data.new_processed.tolist()
+
 verification = p.prepare_input(texts)
 
-goal = pd.read_csv(path_to_goal_sample)
-texts = goal.processed_text.tolist()
-goal = p.prepare_input(texts)
+if path_to_goal_sample:
+    goal = pd.read_csv(path_to_goal_sample)
+    texts = goal.processed_text.tolist()
+    goal = p.prepare_input(texts)
 
 # ======= PARAMS =======
-spatial_dropout = None
+spatial_dropout = 0.1
 window_size = 3
 dropout = 0.7
 recurrent_dropout = 0.5
@@ -110,6 +125,7 @@ activation = 'sigmoid'
 time_distributed = False
 # ======= =======
 
+
 print('Build model...')
 model = Sequential()
 
@@ -118,20 +134,24 @@ if weights:
 else:
     model.add(Embedding(max_features, emb_dim))
 
-# model.add(SpatialDropout1D(spatial_dropout))
+model.add(SpatialDropout1D(spatial_dropout))
 
-model.add(Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout)))
+# change activation to none and add batch normalization
+
+model.add(Bidirectional(LSTM(units, activation=None, dropout=dropout, recurrent_dropout=recurrent_dropout)))
 # model.add(GlobalMaxPool1D())
 # model.add(Dense(1, activation=activation))
 # TODO: Add batch normalization
+model.add(BatchNormalization())
 model.add(Dropout(dropout))
 model.add(Dense(1, activation=activation))
 
 plot_losses = PlotLosses()
+plot_accuracy = PlotAccuracy()
 #
-# early_stopping = EarlyStopping(monitor='val_loss')
+early_stopping = EarlyStopping(monitor='val_loss')
 reduce_lr = ReduceLROnPlateau(monitor='val_loss')
-callbacks_list = [plot_losses, reduce_lr]  # early_stopping]
+callbacks_list = [plot_losses, reduce_lr, plot_accuracy, early_stopping]
 
 if clipnorm:
     optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
@@ -146,10 +166,10 @@ print(model.summary())
 
 print('Loading data...')
 
-previous_weights = "models_dir/model_1543408507.h5"
-model.load_weights(previous_weights)
+# previous_weights = "models_dir/model_1543408507.h5"
+# model.load_weights(previous_weights)
 
-fit = False
+fit = True
 if fit:
     print('Train...')
     model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
@@ -158,7 +178,9 @@ if fit:
     # ================================= MODEL SAVE =========================================
 
     path_to_weights = "models_dir/model_%s.h5" % (timing)
+    path_to_architecture = "models_dir/architecture/model_%s.h5"
     model.save_weights(path_to_weights)
+    model.save(path_to_architecture)
     print('Model is saved %s' % path_to_weights)
 
 else:
@@ -195,41 +217,72 @@ for i in range(len(ver_res)):
 
 logs_name = 'logs/bilstm/%s.txt' % timing
 
-with open(logs_name, 'w') as f:
-    f.write('======= DATASETS =======\n')
-    f.write('Train set data: %s\n' % x_train_set_name)
-    f.write('Test set data: %s\n' % x_test_set_name)
-    f.write('Train labels: %s\n' % y_train_labels)
-    f.write('Test labels: %s\n' % y_test_labels)
-    f.write('Verification data: %s\n' % verification_name)
-    f.write('======= MODEL PARAMS =======\n')
-    f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
-    if weights:
-        f.write('emb_type: %s, emb dim: %s, trainable: %s, time distributed: %s\n' % (
-            emb_type, emb_dim, trainable, time_distributed))
-    f.write('batch size: %s, max features: %s, max len: %s\n' % (
-        batch_size, max_features, max_len))
-    f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
-        window_size, dropout, recurrent_dropout, units, activation))
-    f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
-        loss, optimizer, lr, clipnorm, epochs))
-    f.write('======= RESULTS =======\n')
-    f.write(train_1 + '\n')
-    f.write(train_0 + '\n')
-    f.write(test_1 + '\n')
-    f.write(test_0 + '\n')
-    f.write(verif_1 + '\n')
-    f.write(verif_0 + '\n')
-    f.write('model weights: %s' % path_to_weights + '\n')
+try:
+    stream = open('logs/bilstm/%s.txt' % timing, 'r')
+    stream.close()
+except:
+    with open(logs_name, 'w') as f:
+        f.write('======= DATASETS =======\n')
+        f.write('Train set data: %s\n' % x_train_set_name)
+        f.write('Test set data: %s\n' % x_test_set_name)
+        f.write('Train labels: %s\n' % y_train_labels)
+        f.write('Test labels: %s\n' % y_test_labels)
+        f.write('Verification data: %s\n' % verification_name)
+        f.write('======= MODEL PARAMS =======\n')
+        f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
+        if weights:
+            f.write('emb_type: %s, emb dim: %s, trainable: %s, time distributed: %s\n' % (
+                emb_type, emb_dim, trainable, time_distributed))
+        f.write('batch size: %s, max features: %s, max len: %s\n' % (
+            batch_size, max_features, max_len))
+        f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
+            window_size, dropout, recurrent_dropout, units, activation))
+        f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
+            loss, optimizer, lr, clipnorm, epochs))
+        f.write('======= RESULTS =======\n')
+        f.write(train_1 + '\n')
+        f.write(train_0 + '\n')
+        f.write(test_1 + '\n')
+        f.write(test_0 + '\n')
+        f.write(verif_1 + '\n')
+        f.write(verif_0 + '\n')
+        f.write('model weights: %s' % path_to_weights + '\n')
 
+# ====================== PROCESSING VERIFICATION ============================
+
+if path_to_verification:
+    verification_set_name = path_to_verification.split('/')[-1].split('.')[0]
+    verification_res = model.predict_classes(verification)
+    data = pd.read_csv(path_to_verification)['text'].tolist()
+    label = pd.read_csv(path_to_verification)['label'].tolist()
+    ver_res = [i[0] for i in verification_res]
+    positive_counter = 0
+    negative_counter = 0
+    pos = open('results/positive_%s_%s.txt' % (verification_set_name, timing), 'w')
+    neg = open('results/negative_%s_%s.txt' % (verification_set_name, timing), 'w')
+    for i in range(len(ver_res)):
+        if ver_res[i] == 0:
+            neg.write('\n[%s] ============================================================== [%s]\n' % (i, label[i]))
+            neg.write('\n')
+            neg.write(data[i])
+            neg.write('\n')
+        else:
+            pos.write('\n[%s] ============================================================== [%s]\n' % (i, label[i]))
+            pos.write('\n')
+            pos.write(data[i])
+            pos.write('\n')
+    pos.close()
+    neg.close()
+    print('results/positive_%s_%s.txt' % (verification_set_name, timing))
+    print('results/negative_%s_%s.txt' % (verification_set_name, timing))
 
 # ====================== PROCESSING TEST ============================
+
 if path_to_goal_sample:
     goal_set_name = path_to_goal_sample.split('/')[-1].split('.')[0]
     goal_res = model.predict_classes(goal)
-    data = pd.read_csv(path_to_goal_sample)['text'].sample(frac=1)
-    data = data.reset_index(drop=True)
-    data = data.tolist()
+    data = pd.read_csv(path_to_goal_sample)['text'].tolist()
+    label = pd.read_csv(path_to_goal_sample)['label'].tolist()
     ver_res = [i[0] for i in goal_res]
     positive_counter = 0
     negative_counter = 0
@@ -237,20 +290,20 @@ if path_to_goal_sample:
     neg = open('results/negative_%s_%s.txt' % (goal_set_name, timing), 'w')
     for i in range(len(ver_res)):
         if goal_res[i] == 0:
-            neg.write('\n==============================================================\n')
+            neg.write('\n[%s] ============================================================== [%s]\n' % (i, label[i]))
             neg.write('\n')
             neg.write(data[i])
             neg.write('\n')
         else:
-            pos.write('\n==============================================================\n')
+            pos.write('\n[%s] ============================================================== [%s]\n' % (i, label[i]))
             pos.write('\n')
             pos.write(data[i])
             pos.write('\n')
     pos.close()
     neg.close()
+    print('results/positive_%s_%s.txt' % (goal_set_name, timing))
+    print('results/negative_%s_%s.txt' % (goal_set_name, timing))
 
-print('results/positive_%s_%s.txt' % (goal_set_name, timing))
-print('results/negative_%s_%s.txt' % (goal_set_name, timing))
 
 # ver_res = model.predict_classes(verification)
 # path_to_verification = verification_name
@@ -274,8 +327,6 @@ print('results/negative_%s_%s.txt' % (goal_set_name, timing))
 #     print(raw_text[i])
 #     print()
 
-
-raise ValueError
 
 # ====== compute feature importance with LIME ======
 from lime.lime_text import LimeTextExplainer
