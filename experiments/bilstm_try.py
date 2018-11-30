@@ -59,8 +59,10 @@ x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6_no_ent.csv'
 y_train_labels = '/mnt/shdstorage/for_classification/y_train_6_no_ent.csv'
 y_test_labels = '/mnt/shdstorage/for_classification/y_test_6_no_ent.csv'
 
-verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
-path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
+verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
+#verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
+path_to_goal_sample = '/mnt/shdstorage/for_classification/new_test.csv'
+# path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 # file:///mnt/shdstorage/tmp/classif_tmp/comments_big_unlem.csv
 #
 
@@ -80,7 +82,7 @@ print('Test params: ', len(X_test), len(y_test))
 
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
-texts = data.new_processed.tolist()
+texts = data.processed_text.tolist()
 verification = p.prepare_input(texts)
 
 goal = pd.read_csv(path_to_goal_sample)
@@ -128,10 +130,11 @@ model.add(Dropout(dropout))
 model.add(Dense(1, activation=activation))
 
 plot_losses = PlotLosses()
+plot_accuracy = PlotAccuracy()
 #
 # early_stopping = EarlyStopping(monitor='val_loss')
 reduce_lr = ReduceLROnPlateau(monitor='val_loss')
-callbacks_list = [plot_losses, reduce_lr]  # early_stopping]
+callbacks_list = [plot_losses, reduce_lr, plot_accuracy]  # early_stopping]
 
 if clipnorm:
     optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
@@ -158,7 +161,9 @@ if fit:
     # ================================= MODEL SAVE =========================================
 
     path_to_weights = "models_dir/model_%s.h5" % (timing)
+    path_to_architecture = "models_dir/architecture/model_%s.h5"
     model.save_weights(path_to_weights)
+    model.save(path_to_architecture)
     print('Model is saved %s' % path_to_weights)
 
 else:
@@ -195,39 +200,44 @@ for i in range(len(ver_res)):
 
 logs_name = 'logs/bilstm/%s.txt' % timing
 
-with open(logs_name, 'w') as f:
-    f.write('======= DATASETS =======\n')
-    f.write('Train set data: %s\n' % x_train_set_name)
-    f.write('Test set data: %s\n' % x_test_set_name)
-    f.write('Train labels: %s\n' % y_train_labels)
-    f.write('Test labels: %s\n' % y_test_labels)
-    f.write('Verification data: %s\n' % verification_name)
-    f.write('======= MODEL PARAMS =======\n')
-    f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
-    if weights:
-        f.write('emb_type: %s, emb dim: %s, trainable: %s, time distributed: %s\n' % (
-            emb_type, emb_dim, trainable, time_distributed))
-    f.write('batch size: %s, max features: %s, max len: %s\n' % (
-        batch_size, max_features, max_len))
-    f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
-        window_size, dropout, recurrent_dropout, units, activation))
-    f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
-        loss, optimizer, lr, clipnorm, epochs))
-    f.write('======= RESULTS =======\n')
-    f.write(train_1 + '\n')
-    f.write(train_0 + '\n')
-    f.write(test_1 + '\n')
-    f.write(test_0 + '\n')
-    f.write(verif_1 + '\n')
-    f.write(verif_0 + '\n')
-    f.write('model weights: %s' % path_to_weights + '\n')
+try:
+    stream = open('logs/bilstm/%s.txt' % timing, 'r')
+    stream.close()
+except:
+    with open(logs_name, 'w') as f:
+        f.write('======= DATASETS =======\n')
+        f.write('Train set data: %s\n' % x_train_set_name)
+        f.write('Test set data: %s\n' % x_test_set_name)
+        f.write('Train labels: %s\n' % y_train_labels)
+        f.write('Test labels: %s\n' % y_test_labels)
+        f.write('Verification data: %s\n' % verification_name)
+        f.write('======= MODEL PARAMS =======\n')
+        f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
+        if weights:
+            f.write('emb_type: %s, emb dim: %s, trainable: %s, time distributed: %s\n' % (
+                emb_type, emb_dim, trainable, time_distributed))
+        f.write('batch size: %s, max features: %s, max len: %s\n' % (
+            batch_size, max_features, max_len))
+        f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
+            window_size, dropout, recurrent_dropout, units, activation))
+        f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
+            loss, optimizer, lr, clipnorm, epochs))
+        f.write('======= RESULTS =======\n')
+        f.write(train_1 + '\n')
+        f.write(train_0 + '\n')
+        f.write(test_1 + '\n')
+        f.write(test_0 + '\n')
+        f.write(verif_1 + '\n')
+        f.write(verif_0 + '\n')
+        f.write('model weights: %s' % path_to_weights + '\n')
 
 
 # ====================== PROCESSING TEST ============================
+
 if path_to_goal_sample:
     goal_set_name = path_to_goal_sample.split('/')[-1].split('.')[0]
     goal_res = model.predict_classes(goal)
-    data = pd.read_csv(path_to_goal_sample)['text'].sample(frac=1)
+    data = pd.read_csv(path_to_goal_sample)['text']
     data = data.reset_index(drop=True)
     data = data.tolist()
     ver_res = [i[0] for i in goal_res]

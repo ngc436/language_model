@@ -4,18 +4,18 @@ import pickle
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 
-# config = tf.ConfigProto()
-# config.gpu_options.visible_device_list = "0"
+config = tf.ConfigProto()
+# config.gpu_options.visible_device_list = "1"
 # config.gpu_options.per_process_gpu_memory_fraction = 0.4
-# config.allow_soft_placement = True
-# config.gpu_options.allow_growth = True
-# session = tf.Session(config=config)
-
-config = tf.ConfigProto(
-    device_count={'GPU': 0}
-)
+config.allow_soft_placement = True
+config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
-set_session(session)
+
+# config = tf.ConfigProto(
+#     device_count={'GPU': 0}
+# )
+# session = tf.Session(config=config)
+# set_session(session)
 #
 
 #

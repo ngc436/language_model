@@ -166,14 +166,22 @@ previous_weights = "models_dir/model_1542979324.h5"
 model.load_weights(previous_weights)
 
 
-model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
-          callbacks=callbacks_list)
+fit = False
+if fit:
+    print('Train...')
+    model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
+              callbacks=callbacks_list)
 
-# ================================= MODEL SAVE =========================================
+    # ================================= MODEL SAVE =========================================
 
-path_to_weights = "models_dir/model_%s.h5" % (timing)
-model.save_weights(path_to_weights)
-print('Model is saved %s' % path_to_weights)
+    path_to_weights = "models_dir/model_%s.h5" % (timing)
+    path_to_architecture = "models_dir/architecture/model_%s.h5"
+    model.save_weights(path_to_weights)
+    model.save(path_to_architecture)
+    print('Model is saved %s' % path_to_weights)
+
+else:
+    timing = previous_weights.split('/')[-1].split('_')[-1].split('.')[0]
 
 # ================================= PREDICT GOAL SAMPLE =========================================
 
@@ -202,6 +210,69 @@ if path_to_goal_sample:
     pos.close()
     neg.close()
 
+
+score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
+
+print('Test score:', score)
+print('Test accuracy:', acc)
+
+train_res = model.predict_classes(X_train)
+train_res = [i[0] for i in train_res]
+train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
+
+test_res = model.predict_classes(X_test)
+test_res = [i[0] for i in test_res]
+test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
+
+ver_res = model.predict_classes(verification)
+path_to_verification = verification_name
+data = pd.read_csv(path_to_verification)
+label = data['label'].tolist()
+ver_res = [i[0] for i in ver_res]
+verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION >= 10')
+true_positive = []
+true_negative = []
+for i in range(len(ver_res)):
+    if ver_res[i] == 0 and label[i] == 0:
+        true_negative.append(i)
+    if ver_res[i] == 1 and label[i] == 1:
+        true_positive.append(i)
+
+# ======================= LOGS =======================
+
+
+logs_name = 'logs/qrnn/%s.txt' % timing
+
+try:
+    stream = open('logs/bilstm/%s.txt' % timing, 'r')
+    stream.close()
+except:
+    with open(logs_name, 'w') as f:
+        f.write('======= DATASETS =======\n')
+        f.write('Train set data: %s\n' % x_train_set_name)
+        f.write('Test set data: %s\n' % x_test_set_name)
+        f.write('Train labels: %s\n' % y_train_labels)
+        f.write('Test labels: %s\n' % y_test_labels)
+        f.write('Verification data: %s\n' % verification_name)
+        f.write('======= MODEL PARAMS =======\n')
+        f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
+        if weights:
+            f.write('emb_type: %s, emb dim: %s, trainable: %s, time distributed: %s\n' % (
+                emb_type, emb_dim, trainable, time_distributed))
+        f.write('batch size: %s, max features: %s, max len: %s\n' % (
+            batch_size, max_features, max_len))
+        f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
+            window_size, dropout, recurrent_dropout, units, activation))
+        f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
+            loss, optimizer, lr, clipnorm, epochs))
+        f.write('======= RESULTS =======\n')
+        f.write(train_1 + '\n')
+        f.write(train_0 + '\n')
+        f.write(test_1 + '\n')
+        f.write(test_0 + '\n')
+        f.write(verif_1 + '\n')
+        f.write(verif_0 + '\n')
+        f.write('model weights: %s' % path_to_weights + '\n')
 
 # ====== compute feature importance with LIME ======
 
@@ -261,32 +332,6 @@ for i in idx:
 
 # ====== END ======
 
-score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
-
-print('Test score:', score)
-print('Test accuracy:', acc)
-
-train_res = model.predict_classes(X_train)
-train_res = [i[0] for i in train_res]
-train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
-
-test_res = model.predict_classes(X_test)
-test_res = [i[0] for i in test_res]
-test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
-
-ver_res = model.predict_classes(verification)
-path_to_verification = verification_name
-data = pd.read_csv(path_to_verification)
-label = data['label'].tolist()
-ver_res = [i[0] for i in ver_res]
-verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION >= 10')
-true_positive = []
-true_negative = []
-for i in range(len(ver_res)):
-    if ver_res[i] == 0 and label[i] == 0:
-        true_negative.append(i)
-    if ver_res[i] == 1 and label[i] == 1:
-        true_positive.append(i)
 
 # text = data['text'].tolist()
 # raw_text = data['raw_text'].tolist()
@@ -315,40 +360,6 @@ for i in range(len(ver_res)):
 #     print(raw_text[i])
 #     print()
 
-# ======================= LOGS =======================
-
-pp = PdfPages('multipage.pdf')
-plt.savefig(pp, format='pdf')
-
-logs_name = 'logs/qrnn/%s.txt' % timing
-
-with open(logs_name, 'w') as f:
-    f.write('======= DATASETS =======\n')
-    f.write('Train set data: %s\n' % x_train_set_name)
-    f.write('Test set data: %s\n' % x_test_set_name)
-    f.write('Train labels: %s\n' % y_train_labels)
-    f.write('Test labels: %s\n' % y_test_labels)
-    f.write('Verification data: %s\n' % verification_name)
-    f.write('======= MODEL PARAMS =======\n')
-    f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
-    if weights:
-        f.write('emb_type: %s, emb dim: %s, trainable: %s\n' % (emb_type, emb_dim, trainable))
-    f.write('batch size: %s, max features: %s, max len: %s\n' % (
-        batch_size, max_features, max_len))
-    f.write('spatial dropout: %s, window size: %s, dropout: %s, activation: %s\n' % (
-        spatial_dropout, window_size, dropout, activation))
-    f.write('kernel regularizer: %s, bias regularizer: %s, kernel constraint: %s, bias constraint: %s\n' % (
-        kernel_regularizer, bias_regularizer, 'maxnorm(%s)' % kernel_constraint, 'maxnorm(%s)' % bias_constraint))
-    f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
-        loss, optimizer, lr, clipnorm, epochs))
-    f.write('======= RESULTS =======\n')
-    f.write(train_1 + '\n')
-    f.write(train_0 + '\n')
-    f.write(test_1 + '\n')
-    f.write(test_0 + '\n')
-    f.write(verif_1 + '\n')
-    f.write(verif_0 + '\n')
-    f.write('model weights: %s' % path_to_weights + '\n')
 
 # strike = 0
 # positive_negative = 0

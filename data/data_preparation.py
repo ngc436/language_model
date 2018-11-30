@@ -1,9 +1,5 @@
-# VIP changes are coming
-
 import os.path
 import sys
-from ufal.udpipe import Model, Pipeline
-import wget
 import keras
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -14,11 +10,14 @@ from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 import numpy as np
 from gensim.models import KeyedVectors
-import pandas as pd
 from gensim.models import FastText
 import pickle
 
+import requests
+import re
+
 import pymorphy2
+from pymystem3 import Mystem
 
 morph = pymorphy2.MorphAnalyzer()
 
@@ -27,6 +26,18 @@ path_to_model = '/tmp/web_0_300_20.bin'
 path_to_fasttext_emb = '/tmp/wiki.ru.bin'
 path_to_fasttext_emb_2 = '/home/gmaster/projects/negRevClassif/data/embeddings/ft_native_300_ru_wiki_lenta_lemmatize.bin'
 path_to_fasttext_unlem = '/tmp/ft_native_300_ru_wiki_lenta_lower_case.bin'
+upt_url = 'https://raw.githubusercontent.com/akutuzov/universal-pos-tags/4653e8a9154e93fe2f417c7fdb7a357b7d6ce333/ru-rnc.map'
+
+m = Mystem()
+
+# ==================== ADD UPT MAPPING ========================
+
+mapping = {}
+r = requests.get(upt_url, stream=True)
+for pair in r.text.split('\n'):
+    pair = re.sub('\s+', ' ', pair, flags=re.U).split(' ')
+    if len(pair) > 1:
+        mapping[pair[0]] = pair[1]
 
 
 # udpipe_model_url = 'http://rusvectores.org/static/models/udpipe_syntagrus.model'
@@ -64,6 +75,22 @@ def add_pos_tags(docs):
 
 def add_pos_tag(word):
     return word + '_' + tag_mappings(morph.parse(word)[0].tag.POS)
+
+def add_universal_tag(word):
+    processed = m.analyze(word)
+    tagged = []
+    for w in processed:
+        try:
+            lemma = w["analysis"][0]["lex"].lower().strip()
+            pos = w["analysis"][0]["gr"].split(',')[0]
+            pos = pos.split('=')[0].strip()
+            if pos in mapping:
+                tagged.append(lemma + '_' + mapping[pos])  # здесь мы конвертируем тэги
+            else:
+                tagged.append(lemma + '_X')
+        except KeyError:
+            continue
+    return tagged
 
 
 def embedding(emb_type):
@@ -195,3 +222,5 @@ class DataGenerator(keras.utils.Sequence):
 
     def __data_generation(self, index):
         max_iter = min(self.batch_size, len(self.x)-self.batch_size*index)
+
+add_universal_tag('русский')

@@ -133,7 +133,7 @@ class PlotAccuracy(keras.callbacks.Callback):
         self.x.append(self.i)
         #
         self.acc.append(logs.get('acc'))
-        self.acc.append(logs.get('val_acc'))
+        self.val_acc.append(logs.get('val_acc'))
         self.i += 1
 
         plt.plot(self.x, self.acc, label='acc')
