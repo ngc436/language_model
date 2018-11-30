@@ -2,7 +2,7 @@
 
 from language_model import QRNN
 import language_model
-from data import prepare_input
+from data import Processor
 
 import numpy as np
 import pandas as pd
@@ -36,6 +36,8 @@ class BaseModel:
         self.X_train = None
         self.y_train = None
 
+    def init_model(self):
+        raise NotImplementedError
 
     def prepare_data(self):
 
@@ -46,13 +48,13 @@ class BaseModel:
         y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
         y_test = [y[0] for y in y_test]
 
-        X_train, y_train, X_test, y_test, embedding_matrix, verification = prepare_input(X_train, y_train, X_test,
-                                                                                         y_test,
-                                                                                         max_features=max_features,
-                                                                                         verification_name=verification_name,
-                                                                                         emb_type=emb_type,
-                                                                                         max_len=max_len,
-                                                                                         x_train_name=x_train_name)
+
+
+    def fit(self):
+        raise NotImplementedError
+
+    def predict(self):
+        raise NotImplementedError
 
     def run_pipeline(self, model_type):
         # data preparation
@@ -92,6 +94,8 @@ class BiQrnnModel(BaseModel):
 
     def fit(self):
         print()
+
+
 
 class BiLstmModel(BaseModel):
 

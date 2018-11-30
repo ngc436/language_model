@@ -39,11 +39,11 @@ from language_model import QRNN
 from metrics import calculate_all_metrics
 
 from keras.preprocessing import sequence
-from keras.models import Sequential, model_from_json
-from keras.layers import Dense, Activation, Embedding, SpatialDropout1D, Bidirectional, LSTM
+from keras.models import Sequential
+from keras.layers import Dense, Embedding, SpatialDropout1D, Bidirectional, LSTM
 from keras.regularizers import l2
 from keras.constraints import maxnorm
-from keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from keras.callbacks import ReduceLROnPlateau
 from keras import optimizers
 
 import pandas as pd
@@ -66,7 +66,7 @@ timing = str(int(time.time()))
 
 batch_size = 32
 # TODO: control the dictionary length
-max_features = 200000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 300000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100  # reduce
 emb_dim = 300
 

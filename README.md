@@ -59,7 +59,7 @@ Cleaner data
 
 ##Notes
 - most of the examples in test set (15 samples from vk group with negative comments) were misclassified due to the ORG tag  
-
+- 
 
 ## Datasets
  
@@ -78,3 +78,5 @@ Cleaner data
 4. Kutuzov A., Kuzmenko E. (2017) WebVectors: A Toolkit for Building Web Interfaces for Vector Semantic Models. In: Ignatov D. et al. (eds) Analysis of Images, Social Networks and Texts. AIST 2016. Communications in Computer and Information Science, vol 661. Springer, Cham  
 5. A. Odena and I. Goodfellow, “Tensorfuzz: Debugging neural networks with coverage-guided fuzzing,” arXiv preprint arXiv:1807.10875, 2018.  
 6. Karpathy, A.; Johnson, J.; and Li, F.-F. 2015. Visualizing and understanding recurrent networks. arXiv preprint.
+7. Stephen Merity, Nitish Shirish Keskar, and Richard Socher. An analysis of neural language modeling at multiple scales. arXiv:1803.08240, 2018.  
+8. 

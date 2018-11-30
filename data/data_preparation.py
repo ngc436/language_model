@@ -17,18 +17,20 @@ import requests
 import re
 
 import pymorphy2
-from pymystem3 import Mystem
+import pymystem3
 
 morph = pymorphy2.MorphAnalyzer()
 
-path_to_model = '/tmp/web_0_300_20.bin'
+# path_to_model = '/tmp/web_0_300_20.bin'
+path_to_w2v = '/home/gmaster/projects/negRevClassif/data/embeddings/tayga_1_2.vec'
 # TODO add path to w2v embedding
 path_to_fasttext_emb = '/tmp/wiki.ru.bin'
 path_to_fasttext_emb_2 = '/home/gmaster/projects/negRevClassif/data/embeddings/ft_native_300_ru_wiki_lenta_lemmatize.bin'
 path_to_fasttext_unlem = '/tmp/ft_native_300_ru_wiki_lenta_lower_case.bin'
-upt_url = 'https://raw.githubusercontent.com/akutuzov/universal-pos-tags/4653e8a9154e93fe2f417c7fdb7a357b7d6ce333/ru-rnc.map'
+# add w2v embeddings
 
-m = Mystem()
+upt_url = 'https://raw.githubusercontent.com/akutuzov/universal-pos-tags/4653e8a9154e93fe2f417c7fdb7a357b7d6ce333/ru-rnc.map'
+m = pymystem3.mystem.Mystem(mystem_bin='/home/gmaster/mystem')
 
 # ==================== ADD UPT MAPPING ========================
 
@@ -76,6 +78,7 @@ def add_pos_tags(docs):
 def add_pos_tag(word):
     return word + '_' + tag_mappings(morph.parse(word)[0].tag.POS)
 
+
 def add_universal_tag(word):
     processed = m.analyze(word)
     tagged = []
@@ -95,7 +98,7 @@ def add_universal_tag(word):
 
 def embedding(emb_type):
     if emb_type == 'w2v':
-        model = KeyedVectors.load_word2vec_format(path_to_model, binary=True)
+        model = KeyedVectors.load_word2vec_format(path_to_w2v, binary=True)
     if emb_type == 'fasttext':
         model = FastText.load_fasttext_format(path_to_fasttext_emb)
     if emb_type == 'fasttext_2':
@@ -105,14 +108,6 @@ def embedding(emb_type):
     if emb_type == 'fasttext_unlem':
         model = FastText.load_fasttext_format(path_to_fasttext_unlem)
     return model
-
-
-# def udpipe_tagging(word, text):
-#     pipeline = Pipeline(model, 'tokenize', Pipeline.DEFAULT, Pipeline.DEFAULT, 'conllu')
-#     processed = pipeline.process(text)
-#
-#     raise NotImplementedError
-
 
 # class Input
 # this class can eat set or one instance of text (prepare_sequence)
@@ -156,38 +151,42 @@ class Processor:
 
         return embedding_matrix
 
-    def fit_processor(self, x_train, x_test, x_train_name):
+    def fit_processor(self, x_train, x_test, x_train_name, other=None):
         self.x_train_name = x_train_name
-        try:
-            self.embedding_matrix = np.load(
-                '/home/gmaster/projects/negRevClassif/data/embeddings/%s_%s_%s.npy' % (
-                    self.emb_type, x_train_name, self.max_features))
-            with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
-                    self.emb_type, x_train_name, self.max_features), 'rb') as handle:
-                self.tokenizer = pickle.load(handle)
-            return 0
-
-        # not found exception
-        except:  # to check
-            print('No model found...initialization...')
-            x_train = [sent[0] for sent in x_train]
-            x_test = [sent[0] for sent in x_test]
-            self.tokenizer = Tokenizer(num_words=self.max_features + 1, oov_token='oov')
+        # try:
+        #     self.embedding_matrix = np.load(
+        #         '/home/gmaster/projects/negRevClassif/data/embeddings/%s_%s_%s.npy' % (
+        #             self.emb_type, x_train_name, self.max_features))
+        #     with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
+        #             self.emb_type, x_train_name, self.max_features), 'rb') as handle:
+        #         self.tokenizer = pickle.load(handle)
+        #
+        # # not found exception
+        # except:  # to check
+        print('No model found...initialization...')
+        x_train = [sent[0] for sent in x_train]
+        x_test = [sent[0] for sent in x_test]
+        self.tokenizer = Tokenizer(num_words=self.max_features + 1, oov_token='oov')
+        if not other:
             self.tokenizer.fit_on_texts(x_train + x_test)
-            # hopefully this staff helps to avoid issues with oov (NOT SURE needs to be checked)
-            self.tokenizer.word_index = {e: i for e, i in self.tokenizer.word_index.items() if i <= self.max_features}
-            self.tokenizer.word_index[self.tokenizer.oov_token] = self.max_features + 1
-            word_index = self.tokenizer.word_index
-            with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
-                    self.emb_type, x_train_name, self.max_features), 'wb') as handle:
-                pickle.dump(self.tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        else:
+            if isinstance(other[0], list):
+                other = [sent[0] for sent in other]
+            self.tokenizer.fit_on_texts(x_train + x_test + other)
+        # hopefully this staff helps to avoid issues with oov (NOT SURE needs to be checked)
+        self.tokenizer.word_index = {e: i for e, i in self.tokenizer.word_index.items() if i <= self.max_features}
+        self.tokenizer.word_index[self.tokenizer.oov_token] = self.max_features + 1
+        word_index = self.tokenizer.word_index
+        with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
+                self.emb_type, x_train_name, self.max_features), 'wb') as handle:
+            pickle.dump(self.tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-            # ======================== write tokenizer to file ===================================
+        # ======================== write tokenizer to file ===================================
 
-            print('Amount of unique tokens %s' % len(word_index))
+        print('Amount of unique tokens %s' % len(word_index))
 
-            self.model = embedding(self.emb_type)
-            self.embedding_matrix = self.prepare_embedding_matrix(word_index, x_train_name)
+        self.model = embedding(self.emb_type)
+        self.embedding_matrix = self.prepare_embedding_matrix(word_index, x_train_name)
 
     def prepare_input(self, x, y=None):
         # prepare x data
@@ -221,6 +220,4 @@ class DataGenerator(keras.utils.Sequence):
         return int(np.floor(len(self.ids_list) / self.batch_size))
 
     def __data_generation(self, index):
-        max_iter = min(self.batch_size, len(self.x)-self.batch_size*index)
-
-add_universal_tag('русский')
+        max_iter = min(self.batch_size, len(self.x) - self.batch_size * index)
