@@ -22,8 +22,8 @@ import pymystem3
 morph = pymorphy2.MorphAnalyzer()
 
 # path_to_model = '/tmp/web_0_300_20.bin'
-path_to_w2v = '/home/gmaster/projects/negRevClassif/data/embeddings/tayga_1_2.vec'
-# TODO add path to w2v embedding
+# TODO: find out what's wrong with tayga corpora
+path_to_w2v = '/home/gmaster/projects/negRevClassif/data/embeddings/ruwikiruscorpora_upos_skipgram_300_2_2018.vec'
 path_to_fasttext_emb = '/tmp/wiki.ru.bin'
 path_to_fasttext_emb_2 = '/home/gmaster/projects/negRevClassif/data/embeddings/ft_native_300_ru_wiki_lenta_lemmatize.bin'
 path_to_fasttext_unlem = '/tmp/ft_native_300_ru_wiki_lenta_lower_case.bin'
@@ -98,7 +98,7 @@ def add_universal_tag(word):
 
 def embedding(emb_type):
     if emb_type == 'w2v':
-        model = KeyedVectors.load_word2vec_format(path_to_w2v, binary=True)
+        model = KeyedVectors.load_word2vec_format(path_to_w2v)
     if emb_type == 'fasttext':
         model = FastText.load_fasttext_format(path_to_fasttext_emb)
     if emb_type == 'fasttext_2':
@@ -109,8 +109,7 @@ def embedding(emb_type):
         model = FastText.load_fasttext_format(path_to_fasttext_unlem)
     return model
 
-# class Input
-# this class can eat set or one instance of text (prepare_sequence)
+
 class Processor:
 
     def __init__(self, max_features, emb_type, max_len, emb_dim=300):
@@ -125,19 +124,15 @@ class Processor:
 
     def prepare_embedding_matrix(self, word_index, x_train_name):
         print('Starting embedding matrix preparation...')
-        set_of_undefined = {}
         embedding_matrix = np.zeros((self.max_features, self.emb_dim))
         if self.emb_type == 'w2v':
             for word, i in word_index.items():
                 try:
-                    emb_vect = self.model.wv[add_pos_tag(word)].astype(np.float32)
+                    emb_vect = self.model.wv[add_universal_tag(word)].astype(np.float32)
                     embedding_matrix[i] = emb_vect
                 # out of vocabulary exception
                 except:
-                    if word not in set_of_undefined:
-                        set_of_undefined[word] = np.random.random(self.emb_dim)
-                    embedding_matrix[i] = set_of_undefined[word]
-
+                    print(word)
         else:
             for word, i in word_index.items():
                 try:
@@ -153,40 +148,40 @@ class Processor:
 
     def fit_processor(self, x_train, x_test, x_train_name, other=None):
         self.x_train_name = x_train_name
-        # try:
-        #     self.embedding_matrix = np.load(
-        #         '/home/gmaster/projects/negRevClassif/data/embeddings/%s_%s_%s.npy' % (
-        #             self.emb_type, x_train_name, self.max_features))
-        #     with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
-        #             self.emb_type, x_train_name, self.max_features), 'rb') as handle:
-        #         self.tokenizer = pickle.load(handle)
-        #
-        # # not found exception
-        # except:  # to check
-        print('No model found...initialization...')
-        x_train = [sent[0] for sent in x_train]
-        x_test = [sent[0] for sent in x_test]
-        self.tokenizer = Tokenizer(num_words=self.max_features + 1, oov_token='oov')
-        if not other:
-            self.tokenizer.fit_on_texts(x_train + x_test)
-        else:
-            if isinstance(other[0], list):
-                other = [sent[0] for sent in other]
-            self.tokenizer.fit_on_texts(x_train + x_test + other)
-        # hopefully this staff helps to avoid issues with oov (NOT SURE needs to be checked)
-        self.tokenizer.word_index = {e: i for e, i in self.tokenizer.word_index.items() if i <= self.max_features}
-        self.tokenizer.word_index[self.tokenizer.oov_token] = self.max_features + 1
-        word_index = self.tokenizer.word_index
-        with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
-                self.emb_type, x_train_name, self.max_features), 'wb') as handle:
-            pickle.dump(self.tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        try:
+            self.embedding_matrix = np.load(
+                '/home/gmaster/projects/negRevClassif/data/embeddings/%s_%s_%s.npy' % (
+                    self.emb_type, x_train_name, self.max_features))
+            with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
+                    self.emb_type, x_train_name, self.max_features), 'rb') as handle:
+                self.tokenizer = pickle.load(handle)
 
-        # ======================== write tokenizer to file ===================================
+        # not found exception
+        except:  # to check
+            print('No model found...initialization...')
+            x_train = [sent[0] for sent in x_train]
+            x_test = [sent[0] for sent in x_test]
+            self.tokenizer = Tokenizer(num_words=self.max_features + 1, oov_token='oov')
+            if not other:
+                self.tokenizer.fit_on_texts(x_train + x_test)
+            else:
+                if isinstance(other[0], list):
+                    other = [sent[0] for sent in other]
+                self.tokenizer.fit_on_texts(x_train + x_test + other)
+            # hopefully this staff helps to avoid issues with oov (NOT SURE needs to be checked)
+            self.tokenizer.word_index = {e: i for e, i in self.tokenizer.word_index.items() if i <= self.max_features}
+            self.tokenizer.word_index[self.tokenizer.oov_token] = self.max_features + 1
+            word_index = self.tokenizer.word_index
+            with open('/home/gmaster/projects/negRevClassif/data/embeddings/tokenizer_%s_%s_%s.pickle' % (
+                    self.emb_type, x_train_name, self.max_features), 'wb') as handle:
+                pickle.dump(self.tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        print('Amount of unique tokens %s' % len(word_index))
+            # ======================== write tokenizer to file ===================================
 
-        self.model = embedding(self.emb_type)
-        self.embedding_matrix = self.prepare_embedding_matrix(word_index, x_train_name)
+            print('Amount of unique tokens %s' % len(word_index))
+
+            self.model = embedding(self.emb_type)
+            self.embedding_matrix = self.prepare_embedding_matrix(word_index, x_train_name)
 
     def prepare_input(self, x, y=None):
         # prepare x data

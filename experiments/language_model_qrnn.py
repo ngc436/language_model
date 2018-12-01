@@ -4,7 +4,7 @@
 import tensorflow as tf
 
 config = tf.ConfigProto()
-config.gpu_options.visible_device_list = "1"
+config.gpu_options.visible_device_list = "0"
 # config.gpu_options.per_process_gpu_memory_fraction = 0.4
 config.allow_soft_placement = True
 config.gpu_options.allow_growth = True
@@ -40,7 +40,7 @@ from metrics import calculate_all_metrics
 
 from keras.preprocessing import sequence
 from keras.models import Sequential
-from keras.layers import Dense, Embedding, SpatialDropout1D, Bidirectional, LSTM
+from keras.layers import Dense, Embedding, SpatialDropout1D, Bidirectional, LSTM, Dropout
 from keras.regularizers import l2
 from keras.constraints import maxnorm
 from keras.callbacks import ReduceLROnPlateau
@@ -66,19 +66,18 @@ timing = str(int(time.time()))
 
 batch_size = 32
 # TODO: control the dictionary length
-max_features = 300000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100  # reduce
 emb_dim = 300
 
-x_train_set_name = '/mnt/shdstorage/for_classification/X_train_6.csv'
+x_train_set_name = '/mnt/shdstorage/for_classification/X_train_6_no_ent.csv'
 x_train_name = x_train_set_name.split('/')[-1].split('.')[0]
-x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6.csv'
-y_train_labels = '/mnt/shdstorage/for_classification/y_train_6.csv'
-y_test_labels = '/mnt/shdstorage/for_classification/y_test_6.csv'
+x_test_set_name = '/mnt/shdstorage/for_classification/X_test_6_no_ent.csv'
+y_train_labels = '/mnt/shdstorage/for_classification/y_train_6_no_ent.csv'
+y_test_labels = '/mnt/shdstorage/for_classification/y_test_6_no_ent.csv'
+path_to_goal_sample = None
 
-verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
-# path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/test.csv'
-path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
+verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
 
 emb_type = 'fasttext_2'
 
@@ -87,30 +86,29 @@ X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
 y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
 y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 
-X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
-X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
-y_train = pd.read_csv(y_train_labels, header=None).values.tolist()
-y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
-
-
-p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len)
-p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name)
-X_train, y_train = p.prepare_input(X_train, y_train)
-X_test, y_test = p.prepare_input(X_test, y_test)
-
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
-texts = data.processed_text.tolist()
+texts = data.processed_text_no_tags.tolist()
+
+p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len)
+p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name, other=texts)
+X_train, y_train = p.prepare_input(X_train, y_train)
+print('Train params: ', len(X_train), len(y_train))
+X_test, y_test = p.prepare_input(X_test, y_test)
+print('Test params: ', len(X_test), len(y_test))
+
 verification = p.prepare_input(texts)
 
-goal = pd.read_csv(path_to_goal_sample)
-texts = goal.processed_text.tolist()
-goal = p.prepare_input(texts)
+if path_to_goal_sample:
+    goal = pd.read_csv(path_to_goal_sample)
+    texts = goal.processed_text.tolist()
+    goal = p.prepare_input(texts)
+
 
 # ======= PARAMS =======
-spatial_dropout = 0.4
+spatial_dropout = 0.1
 window_size = 3
-dropout = 0.5
+dropout = 0.3
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
@@ -120,7 +118,7 @@ optimizer = 'adam'
 model_type = 'Bidirectional'
 lr = 0.00001  # changed from 0.00001
 clipnorm = None
-epochs = 50  # 20
+epochs = 25  # 20
 weights = True
 trainable = True
 previous_weights = None
@@ -139,13 +137,14 @@ model.add(SpatialDropout1D(spatial_dropout))
 model.add(Bidirectional(QRNN(emb_dim, window_size=window_size, dropout=dropout,
                              kernel_regularizer=l2(kernel_regularizer), bias_regularizer=l2(bias_regularizer),
                              kernel_constraint=maxnorm(kernel_constraint), bias_constraint=maxnorm(bias_constraint))))
-
+model.add(Dropout(dropout))
 model.add(Dense(1, activation=activation))
 
 plot_losses = PlotLosses()
-# early_stopping = EarlyStopping(monitor='val_loss', restore_best_weights=True)
+plot_accuracy = PlotAccuracy()
+
 reduce_rate = ReduceLROnPlateau(monitor='val_loss')
-callbacks_list = [plot_losses, reduce_rate]  # early_stopping]
+callbacks_list = [plot_losses, reduce_rate, plot_accuracy]
 
 if clipnorm:
     optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
@@ -158,15 +157,13 @@ print(model.summary())
 
 # norm = math.sqrt(sum(numpy.sum(K.get_value(w)) for w in model.optimizer.weights))
 
-print('Loading data...')
 
-print('Train...')
-
-previous_weights = "models_dir/model_1542979324.h5"
-model.load_weights(previous_weights)
+# print('Loading weights...')
+# previous_weights = "models_dir/model_1542979324.h5"
+# model.load_weights(previous_weights)
 
 
-fit = False
+fit = True
 if fit:
     print('Train...')
     model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
@@ -174,8 +171,8 @@ if fit:
 
     # ================================= MODEL SAVE =========================================
 
-    path_to_weights = "models_dir/model_%s.h5" % (timing)
-    path_to_architecture = "models_dir/architecture/model_%s.h5"
+    path_to_weights = '/mnt/shdstorage/for_classification/models_dir/model_%s.h5' % (timing)
+    path_to_architecture = "/mnt/shdstorage/for_classification/models_dir/architecture/model_%s.h5"
     model.save_weights(path_to_weights)
     model.save(path_to_architecture)
     print('Model is saved %s' % path_to_weights)
@@ -183,38 +180,12 @@ if fit:
 else:
     timing = previous_weights.split('/')[-1].split('_')[-1].split('.')[0]
 
-# ================================= PREDICT GOAL SAMPLE =========================================
-
-if path_to_goal_sample:
-    goal_set_name = path_to_goal_sample.split('/')[-1].split('.')[0]
-    goal_res = model.predict_classes(goal)
-    data = pd.read_csv(path_to_goal_sample)['text'].sample(frac=1)
-    data = data.reset_index(drop=True)
-    data = data.tolist()
-    ver_res = [i[0] for i in goal_res]
-    positive = []
-    negative = []
-    pos = open('results/positive_%s_%s.txt' % (goal_set_name, timing), 'w')
-    neg = open('results/negative_%s_%s.txt' % (goal_set_name, timing), 'w')
-    for i in range(len(ver_res)):
-        if goal_res[i] == 0:
-            neg.write('\n==============================================================\n')
-            neg.write('\n')
-            neg.write(data[i])
-            neg.write('\n')
-        else:
-            pos.write('\n==============================================================\n')
-            pos.write('\n')
-            pos.write(data[i])
-            pos.write('\n')
-    pos.close()
-    neg.close()
-
-
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 
 print('Test score:', score)
 print('Test accuracy:', acc)
+
+# ============================== PRINT METRICS =====================================
 
 train_res = model.predict_classes(X_train)
 train_res = [i[0] for i in train_res]
@@ -229,14 +200,7 @@ path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
 label = data['label'].tolist()
 ver_res = [i[0] for i in ver_res]
-verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION >= 10')
-true_positive = []
-true_negative = []
-for i in range(len(ver_res)):
-    if ver_res[i] == 0 and label[i] == 0:
-        true_negative.append(i)
-    if ver_res[i] == 1 and label[i] == 1:
-        true_positive.append(i)
+verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION')
 
 # ======================= LOGS =======================
 
@@ -244,7 +208,7 @@ for i in range(len(ver_res)):
 logs_name = 'logs/qrnn/%s.txt' % timing
 
 try:
-    stream = open('logs/bilstm/%s.txt' % timing, 'r')
+    stream = open('logs/qrnn/%s.txt' % timing, 'r')
     stream.close()
 except:
     with open(logs_name, 'w') as f:
@@ -257,12 +221,13 @@ except:
         f.write('======= MODEL PARAMS =======\n')
         f.write('model type %s, previous weights: %s \n' % (model_type, previous_weights))
         if weights:
-            f.write('emb_type: %s, emb dim: %s, trainable: %s, time distributed: %s\n' % (
-                emb_type, emb_dim, trainable, time_distributed))
+            f.write('emb_type: %s, emb dim: %s, trainable: %s\n' % (emb_type, emb_dim, trainable))
         f.write('batch size: %s, max features: %s, max len: %s\n' % (
             batch_size, max_features, max_len))
-        f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
-            window_size, dropout, recurrent_dropout, units, activation))
+        f.write('spatial dropout: %s, window size: %s, dropout: %s, activation: %s\n' % (
+            spatial_dropout, window_size, dropout, activation))
+        f.write('kernel regularizer: %s, bias regularizer: %s, kernel constraint: %s, bias constraint: %s\n' % (
+            kernel_regularizer, bias_regularizer, 'maxnorm(%s)' % kernel_constraint, 'maxnorm(%s)' % bias_constraint))
         f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
             loss, optimizer, lr, clipnorm, epochs))
         f.write('======= RESULTS =======\n')
@@ -272,7 +237,64 @@ except:
         f.write(test_0 + '\n')
         f.write(verif_1 + '\n')
         f.write(verif_0 + '\n')
-        f.write('model weights: %s' % path_to_weights + '\n')
+    f.write('model weights: %s' % path_to_weights + '\n')
+
+# ====================== PROCESSING VERIFICATION ============================
+
+if path_to_verification:
+    verification_set_name = path_to_verification.split('/')[-1].split('.')[0]
+    verification_res = model.predict_classes(verification)
+    data = pd.read_csv(path_to_verification)['text'].tolist()
+    label = pd.read_csv(path_to_verification)['label'].tolist()
+    ver_res = [i[0] for i in verification_res]
+    positive_counter = 0
+    negative_counter = 0
+    pos = open('results/positive_%s_%s.txt' % (verification_set_name, timing), 'w')
+    neg = open('results/negative_%s_%s.txt' % (verification_set_name, timing), 'w')
+    for i in range(len(ver_res)):
+        if ver_res[i] == 0:
+            neg.write('\n[%s] ============================================================== [%s]\n' % (i, label[i]))
+            neg.write('\n')
+            neg.write(data[i])
+            neg.write('\n')
+        else:
+            pos.write('\n[%s] ============================================================== [%s]\n' % (i, label[i]))
+            pos.write('\n')
+            pos.write(data[i])
+            pos.write('\n')
+    pos.close()
+    neg.close()
+    print('results/positive_%s_%s.txt' % (verification_set_name, timing))
+    print('results/negative_%s_%s.txt' % (verification_set_name, timing))
+
+# ====================== PROCESSING TEST ============================
+
+if path_to_goal_sample:
+    goal_set_name = path_to_goal_sample.split('/')[-1].split('.')[0]
+    goal_res = model.predict_classes(goal)
+    data = pd.read_csv(path_to_goal_sample)['text'].tolist()
+    label = pd.read_csv(path_to_goal_sample)['label'].tolist()
+    ver_res = [i[0] for i in goal_res]
+    positive_counter = 0
+    negative_counter = 0
+    pos = open('results/positive_%s_%s.txt' % (goal_set_name, timing), 'w')
+    neg = open('results/negative_%s_%s.txt' % (goal_set_name, timing), 'w')
+    for i in range(len(ver_res)):
+        if goal_res[i] == 0:
+            neg.write('\n[%s] ============================================================== [%s]\n' % (i, label[i]))
+            neg.write('\n')
+            neg.write(data[i])
+            neg.write('\n')
+        else:
+            pos.write('\n[%s] ============================================================== [%s]\n' % (i, label[i]))
+            pos.write('\n')
+            pos.write(data[i])
+            pos.write('\n')
+    pos.close()
+    neg.close()
+    print('results/positive_%s_%s.txt' % (goal_set_name, timing))
+    print('results/negative_%s_%s.txt' % (goal_set_name, timing))
+
 
 # ====== compute feature importance with LIME ======
 
