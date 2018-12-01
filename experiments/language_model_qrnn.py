@@ -64,7 +64,7 @@ from lime.lime_text import LimeTextExplainer
 
 timing = str(int(time.time()))
 
-batch_size = 32
+batch_size = 128
 # TODO: control the dictionary length
 max_features = 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100  # reduce
@@ -79,7 +79,7 @@ path_to_goal_sample = None
 
 verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
 
-emb_type = 'fasttext_2'
+emb_type = 'w2v'
 
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
@@ -88,7 +88,8 @@ y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
-texts = data.processed_text_no_tags.tolist()
+# column processed_texts_no_tags is missing
+texts = data.processed_text.tolist()
 
 p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len)
 p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name, other=texts)
@@ -116,7 +117,7 @@ bias_constraint = 6
 loss = 'binary_crossentropy'
 optimizer = 'adam'
 model_type = 'Bidirectional'
-lr = 0.00001  # changed from 0.00001
+lr = 0.00005  # changed from 0.00001
 clipnorm = None
 epochs = 25  # 20
 weights = True
@@ -134,7 +135,7 @@ else:
     model.add(Embedding(max_features, emb_dim))
 
 model.add(SpatialDropout1D(spatial_dropout))
-model.add(Bidirectional(QRNN(emb_dim, window_size=window_size, dropout=dropout,
+model.add(Bidirectional(QRNN(emb_dim//2, window_size=window_size, dropout=dropout,
                              kernel_regularizer=l2(kernel_regularizer), bias_regularizer=l2(bias_regularizer),
                              kernel_constraint=maxnorm(kernel_constraint), bias_constraint=maxnorm(bias_constraint))))
 model.add(Dropout(dropout))
@@ -159,7 +160,7 @@ print(model.summary())
 
 
 # print('Loading weights...')
-# previous_weights = "models_dir/model_1542979324.h5"
+# previous_weights = "/mnt/shdstorage/for_classification/models_dir/model_1543691537.h5"
 # model.load_weights(previous_weights)
 
 

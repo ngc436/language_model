@@ -31,6 +31,8 @@ set_session(session)
 # session = tf.Session(config=config)
 # set_session(session)
 
+from keras.preprocessing.sequence import pad_sequences
+
 import time
 import numpy as np
 import logging
@@ -60,7 +62,7 @@ batch_size = 128
 # cut words with 1, 2 appearances
 # 61502 in version with no ent
 # 123004 in cut version without entities
-max_features = 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 60002 # 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100
 emb_dim = 300
 
@@ -87,16 +89,43 @@ y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
-texts = data.processed_text_no_tags.tolist()
+# TODO: add processed_text_no_tags column
+texts = data.processed_text.tolist()
 
-p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
-p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name, other=texts)
-X_train, y_train = p.prepare_input(X_train, y_train)
-print('Train params: ', len(X_train), len(y_train))
-X_test, y_test = p.prepare_input(X_test, y_test)
-print('Test params: ', len(X_test), len(y_test))
+# p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
+# p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name, other=texts)
+# X_train, y_train = p.prepare_input(X_train, y_train)
+# print(X_train[0])
+# print('Train params: ', len(X_train), len(y_train))
+# X_test, y_test = p.prepare_input(X_test, y_test)
+# print('Test params: ', len(X_test), len(y_test))
+#
+# verification = p.prepare_input(texts)
 
-verification = p.prepare_input(texts)
+# =============================== try simple modeling on raw text
+
+y_train = pd.read_csv('/mnt/shdstorage/for_classification/train_raw.csv')['label'].tolist()
+y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_raw.csv')['label'].tolist()
+
+if isinstance(y_train[0], list):
+    y_train = [y[0] for y in y_train]
+y_train = np.asarray(y_train)
+
+if isinstance(y_test[0], list):
+    y_test = [y[0] for y in y_test]
+y_test = np.asarray(y_test)
+
+X_train = np.load('/mnt/shdstorage/for_classification/trn_ids.npy')
+X_test = np.load('/mnt/shdstorage/for_classification/val_ids.npy')
+X_train = pad_sequences(X_train, maxlen=max_len)
+X_test = pad_sequences(X_test, maxlen=max_len)
+
+verification = np.load('/mnt/shdstorage/for_classification/test_ids.npy')
+verification = pad_sequences(verification, maxlen=max_len)
+
+print(X_train[0])
+
+# =================================== end of test block
 
 if path_to_goal_sample:
     goal = pd.read_csv(path_to_goal_sample)
@@ -119,8 +148,8 @@ model_type = 'Bidirectional'
 lr = 0.001
 clipnorm = None
 epochs = 25
-weights = True
-trainable = False
+weights = False
+trainable = True
 previous_weights = None
 activation = 'sigmoid'
 time_distributed = False
@@ -134,6 +163,7 @@ model = Sequential()
 if weights:
     model.add(Embedding(max_features, emb_dim, weights=[p.embedding_matrix], trainable=trainable))
 else:
+    # model.add(Embedding())
     model.add(Embedding(max_features, emb_dim))
 
 model.add(SpatialDropout1D(spatial_dropout))

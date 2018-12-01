@@ -5,7 +5,7 @@ import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 
 config = tf.ConfigProto()
-# config.gpu_options.visible_device_list = "1"
+config.gpu_options.visible_device_list = "0"
 # config.gpu_options.per_process_gpu_memory_fraction = 0.4
 config.allow_soft_placement = True
 config.gpu_options.allow_growth = True
@@ -37,12 +37,12 @@ from data import Processor
 print('Build model...')
 
 # ======= PARAMS =======
-batch_size = 128
+batch_size = 32
 max_features = 221952  # 172567 # 233382
-latent_dim = 200
+latent_dim = 100
 max_len = 100  # reduce
 emb_dim = 300
-int_dim = 96
+int_dim = 150
 recurrent_dropout = 0.2
 spatial_dropout = 0.1
 window_size = 3
@@ -173,7 +173,7 @@ vae.fit(X_train, X_train, batch_size=batch_size, epochs=epochs, validation_data=
 
 encoder = Model(x, z_mean)
 
-decoder_input = Input(shape=(latent_dim))
+decoder_input = Input(shape=(latent_dim,))
 _h_decoded = decoder_h(decoder_input)
 _x_decoded_mean = decoder_mean(_h_decoded)
 generator = Model(decoder_input, _x_decoded_mean)
