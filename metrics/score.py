@@ -36,11 +36,4 @@ def calculate_precision(y_true, y_pred):
 def calculate_f1(y_true, y_pred):
     return f1_score(y_true, y_pred)
 
-
-y = [0, 1, 1, 1, 0]
-y_true = [1, 1, 1, 1, 0]
-# TP = 3, TN = 1, FP = 1, FN =
-# recall(1):
-print(y)
-print(1 - np.array(y))
-print(1 - np.array(y_true))
+# def

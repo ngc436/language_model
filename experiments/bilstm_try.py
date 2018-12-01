@@ -1,5 +1,6 @@
 # Other staff:
 # layer normalization: https://gist.github.com/udibr/7f46e790c9e342d75dcbd9b1deb9d940
+# pretrained LM for russian: https://github.com/ppleskov/Russian-Language-Model
 
 # to use word dropout
 # from language_model import TimestepDropout
@@ -20,6 +21,7 @@ session = tf.Session(config=config)
 
 from keras.backend.tensorflow_backend import set_session
 from collections import OrderedDict
+
 #
 set_session(session)
 
@@ -28,6 +30,8 @@ set_session(session)
 # )
 # session = tf.Session(config=config)
 # set_session(session)
+
+from keras.preprocessing.sequence import pad_sequences
 
 import time
 import numpy as np
@@ -54,11 +58,11 @@ from data import Processor
 
 timing = str(int(time.time()))
 
-batch_size = 64
+batch_size = 128
 # cut words with 1, 2 appearances
 # 61502 in version with no ent
 # 123004 in cut version without entities
-max_features = 300000  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 60002 # 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100
 emb_dim = 300
 
@@ -76,7 +80,7 @@ verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
 # file:///mnt/shdstorage/tmp/classif_tmp/comments_big_unlem.csv
 #
 
-emb_type = 'fasttext_2'
+emb_type = 'w2v'
 
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
@@ -85,17 +89,43 @@ y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
-texts = data.processed_text_no_tags.tolist()
+# TODO: add processed_text_no_tags column
+texts = data.processed_text.tolist()
 
-p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
-p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name, other=texts)
-X_train, y_train = p.prepare_input(X_train, y_train)
-print('Train params: ', len(X_train), len(y_train))
-X_test, y_test = p.prepare_input(X_test, y_test)
-print('Test params: ', len(X_test), len(y_test))
+# p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
+# p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name, other=texts)
+# X_train, y_train = p.prepare_input(X_train, y_train)
+# print(X_train[0])
+# print('Train params: ', len(X_train), len(y_train))
+# X_test, y_test = p.prepare_input(X_test, y_test)
+# print('Test params: ', len(X_test), len(y_test))
+#
+# verification = p.prepare_input(texts)
 
+# =============================== try simple modeling on raw text
 
-verification = p.prepare_input(texts)
+y_train = pd.read_csv('/mnt/shdstorage/for_classification/train_raw.csv')['label'].tolist()
+y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_raw.csv')['label'].tolist()
+
+if isinstance(y_train[0], list):
+    y_train = [y[0] for y in y_train]
+y_train = np.asarray(y_train)
+
+if isinstance(y_test[0], list):
+    y_test = [y[0] for y in y_test]
+y_test = np.asarray(y_test)
+
+X_train = np.load('/mnt/shdstorage/for_classification/trn_ids.npy')
+X_test = np.load('/mnt/shdstorage/for_classification/val_ids.npy')
+X_train = pad_sequences(X_train, maxlen=max_len)
+X_test = pad_sequences(X_test, maxlen=max_len)
+
+verification = np.load('/mnt/shdstorage/for_classification/test_ids.npy')
+verification = pad_sequences(verification, maxlen=max_len)
+
+print(X_train[0])
+
+# =================================== end of test block
 
 if path_to_goal_sample:
     goal = pd.read_csv(path_to_goal_sample)
@@ -105,9 +135,9 @@ if path_to_goal_sample:
 # ======= PARAMS =======
 spatial_dropout = 0.1
 window_size = 3
-dropout = 0.7
+dropout = 0.3
 recurrent_dropout = 0.5
-units = 300
+units = 150  #
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
@@ -117,14 +147,15 @@ optimizer = 'adam'
 model_type = 'Bidirectional'
 lr = 0.001
 clipnorm = None
-epochs = 50
-weights = True
-trainable = False
+epochs = 25
+weights = False
+trainable = True
 previous_weights = None
 activation = 'sigmoid'
 time_distributed = False
 # ======= =======
 
+# ================================ MODEL ==========================================
 
 print('Build model...')
 model = Sequential()
@@ -132,17 +163,17 @@ model = Sequential()
 if weights:
     model.add(Embedding(max_features, emb_dim, weights=[p.embedding_matrix], trainable=trainable))
 else:
+    # model.add(Embedding())
     model.add(Embedding(max_features, emb_dim))
 
 model.add(SpatialDropout1D(spatial_dropout))
 
 # change activation to none and add batch normalization
 
-model.add(Bidirectional(LSTM(units, activation=None, dropout=dropout, recurrent_dropout=recurrent_dropout)))
+model.add(Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout)))
 # model.add(GlobalMaxPool1D())
 # model.add(Dense(1, activation=activation))
-# TODO: Add batch normalization
-model.add(BatchNormalization())
+# model.add(BatchNormalization()) #?
 model.add(Dropout(dropout))
 model.add(Dense(1, activation=activation))
 
@@ -151,7 +182,7 @@ plot_accuracy = PlotAccuracy()
 #
 early_stopping = EarlyStopping(monitor='val_loss')
 reduce_lr = ReduceLROnPlateau(monitor='val_loss')
-callbacks_list = [plot_losses, reduce_lr, plot_accuracy, early_stopping]
+callbacks_list = [plot_losses, reduce_lr, plot_accuracy]
 
 if clipnorm:
     optimizer = optimizers.Adam(lr=lr, clipnorm=clipnorm)
@@ -162,10 +193,11 @@ model.compile(loss=loss,
               metrics=['accuracy'])
 print(model.summary())
 
+# ================================== END ============================================
+
 # norm = math.sqrt(sum(numpy.sum(K.get_value(w)) for w in model.optimizer.weights))
 
-print('Loading data...')
-
+# print('Loading weights...')
 # previous_weights = "models_dir/model_1543408507.h5"
 # model.load_weights(previous_weights)
 
@@ -177,8 +209,9 @@ if fit:
 
     # ================================= MODEL SAVE =========================================
 
-    path_to_weights = "models_dir/model_%s.h5" % (timing)
-    path_to_architecture = "models_dir/architecture/model_%s.h5"
+    # path_to_weights = "models_dir/model_%s.h5" % (timing)
+    path_to_weights = '/mnt/shdstorage/for_classification/models_dir/model_%s.h5' % (timing)
+    path_to_architecture = "/mnt/shdstorage/for_classification/models_dir/architecture/model_%s.h5"
     model.save_weights(path_to_weights)
     model.save(path_to_architecture)
     print('Model is saved %s' % path_to_weights)
@@ -190,6 +223,8 @@ score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 
 print('Test score:', score)
 print('Test accuracy:', acc)
+
+# ============================== PRINT METRICS =====================================
 
 train_res = model.predict_classes(X_train)
 train_res = [i[0] for i in train_res]
@@ -204,14 +239,7 @@ path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
 label = data['label'].tolist()
 ver_res = [i[0] for i in ver_res]
-verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION >= 10')
-true_positive = []
-true_negative = []
-for i in range(len(ver_res)):
-    if ver_res[i] == 0 and label[i] == 0:
-        true_negative.append(i)
-    if ver_res[i] == 1 and label[i] == 1:
-        true_positive.append(i)
+verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION')
 
 # ======================= LOGS =======================
 
@@ -304,7 +332,6 @@ if path_to_goal_sample:
     print('results/positive_%s_%s.txt' % (goal_set_name, timing))
     print('results/negative_%s_%s.txt' % (goal_set_name, timing))
 
-
 # ver_res = model.predict_classes(verification)
 # path_to_verification = verification_name
 # data = pd.read_csv(path_to_verification)
@@ -362,6 +389,19 @@ num_samples = 2500
 
 data = pd.read_csv(path_to_goal_sample)
 # data = data.sample(frac=1).reset_index(drop=True)
+
+# take n random examples from TP, FP, TN and FN
+
+def lime_processing(texts, true_labels, examples_per_part=5, num_features=20, num_samples=2500):
+
+    # get IDs of TP, FP, TN and FN
+    data = p.prepare_input(texts)
+    goal_res = model.predict_classes(goal)
+
+    class_names = ['positive', 'negative']
+    explainer = LimeTextExplainer(class_names=class_names)
+
+    raise NotImplementedError
 
 idx = [143, 103, 3309, 10625, 67, 42, 37, 23, 237, 267, 2002, 2025, 2099, 2140, 13, 140, 137, 2128, 263, 3481, 11696]
 

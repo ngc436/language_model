@@ -59,7 +59,7 @@ Cleaner data
 
 ##Notes
 - most of the examples in test set (15 samples from vk group with negative comments) were misclassified due to the ORG tag  
-- 
+- pretrained LM for russian: https://github.com/ppleskov/Russian-Language-Model
 
 ## Datasets
  
