@@ -2,6 +2,8 @@ import os.path
 import sys
 import keras
 
+# TODO: initialize unknown words with average from all embeddings
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 # TODO: remove wrong tokenizers (old version)
@@ -202,6 +204,36 @@ class Processor:
         sequences = self.tokenizer.texts_to_sequences(text)
         x = pad_sequences(sequences, maxlen=self.max_len)
         return x
+
+    def prepare_custom_embedding(self,  vocabulary, x_train_name='custom'):
+        self.max_features = len(vocabulary)
+        try:
+            self.embedding_matrix = np.load('/home/gmaster/projects/negRevClassif/data/embeddings/%s_%s_%s.npy' % (
+                    self.emb_type, x_train_name, self.max_features))
+        except:
+            print('Starting embedding matrix preparation...')
+            self.model = embedding(self.emb_type)
+            embedding_matrix = np.zeros((len(vocabulary), self.emb_dim))
+            if self.emb_type == 'w2v':
+                for i, word in enumerate(vocabulary):
+                    try:
+                        emb_vect = self.model.wv[add_universal_tag(word)].astype(np.float32)
+                        embedding_matrix[i] = emb_vect
+                    # out of vocabulary exception
+                    except:
+                        print(word)
+            else:
+                for i, word in enumerate(vocabulary):
+                    try:
+                        emb_vect = self.model.wv[word]
+                        embedding_matrix[i] = emb_vect.astype(np.float32)
+                    # out of vocabulary exception
+                    except:
+                        print(word)
+
+            self.embedding_matrix = embedding_matrix
+            np.save('/home/gmaster/projects/negRevClassif/data/embeddings/%s_%s_%s.npy' % (
+                self.emb_type, x_train_name, self.max_features), embedding_matrix)
 
 
 class DataGenerator(keras.utils.Sequence):

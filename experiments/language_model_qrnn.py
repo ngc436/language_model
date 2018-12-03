@@ -11,7 +11,7 @@ config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
 
 from keras.backend.tensorflow_backend import set_session
-from matplotlib.backends.backend_pdf import PdfPages
+# from matplotlib.backends.backend_pdf import PdfPages
 
 #
 set_session(session)
