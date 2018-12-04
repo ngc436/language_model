@@ -63,10 +63,10 @@ fname_x_batches = '/home/gmaster/projects/other/elmo/embeddings/X_train/'
 fname_y = '/mnt/shdstorage/for_classification/y_train_6_no_ent.csv'
 
 
+# TODO: change to simple batch yield function
 class DataGenerator:
 
     def __init__(self, fname_x_batches, fname_y, batch_size, num_of_batches):
-        
         self.fname_x_batches = fname_x_batches
         self.y = self.prepare_y(fname_y)
         self.num_of_batches = num_of_batches

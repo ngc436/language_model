@@ -50,10 +50,11 @@ max_len = 100
 # =========== DATA PREP ============
 
 verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
+train_fname = '/mnt/shdstorage/for_classification/train_6_edited_text.csv'
 
 p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
-y_train = pd.read_csv('/mnt/shdstorage/for_classification/train_6_edited_text.csv')['label'].tolist()
-x_train_name = '/mnt/shdstorage/for_classification/train_6_edited_text.csv'.split('/')[-1].split('.')[0]
+y_train = pd.read_csv(train_fname)['label'].tolist()
+x_train_name = train_fname.split('/')[-1].split('.')[0]
 y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_6_edited_text.csv')['label'].tolist()
 
 if isinstance(y_train[0], list):
@@ -117,8 +118,14 @@ plot_accuracy = PlotAccuracy()
 reduce_lr = ReduceLROnPlateau(monitor='val_loss')
 callbacks_list = [plot_losses, reduce_lr, plot_accuracy]
 
-model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
-          callbacks=callbacks_list)
+print('Loading weights...')
+previous_weights = "/mnt/shdstorage/for_classification/models_dir/model_1543849921.h5"
+model.load_weights(previous_weights)
+
+fit = False
+if fit:
+    model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
+              callbacks=callbacks_list)
 
 path_to_weights = '/mnt/shdstorage/for_classification/models_dir/model_%s.h5' % (timing)
 path_to_architecture = "/mnt/shdstorage/for_classification/models_dir/architecture/model_%s.h5"
@@ -133,29 +140,31 @@ print('Test accuracy:', acc)
 
 # ================= PRINT METRICS ======================
 
-train_res = model.predict_classes(X_train)
+train_res = model.predict(X_train)
 train_res = [i[0] for i in train_res]
+train_res = [1 if i > 0.5 else 0 for i in train_res]
 train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
 
-test_res = model.predict_classes(X_test)
+test_res = model.predict(X_test)
 test_res = [i[0] for i in test_res]
+test_res = [1 if i > 0.5 else 0 for i in test_res]
 test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
 
-ver_res = model.predict_classes(verification)
+ver_res = model.predict(verification)
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
 label = data['label'].tolist()
 ver_res = [i[0] for i in ver_res]
+ver_res = [1 if i > 0.5 else 0 for i in ver_res]
 verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION')
 
 # ====================== PROCESSING VERIFICATION ============================
 
 if path_to_verification:
     verification_set_name = path_to_verification.split('/')[-1].split('.')[0]
-    verification_res = model.predict_classes(verification)
     data = pd.read_csv(path_to_verification)['text'].tolist()
     label = pd.read_csv(path_to_verification)['label'].tolist()
-    ver_res = [i[0] for i in verification_res]
+    ver_res = [i[0] for i in ver_res]
     positive_counter = 0
     negative_counter = 0
     pos = open('results/positive_%s_%s.txt' % (verification_set_name, timing), 'w')

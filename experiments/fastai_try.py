@@ -17,6 +17,8 @@ test = pd.read_csv('/mnt/shdstorage/for_classification/new_test.csv')
 val = pd.read_csv('/mnt/shdstorage/for_classification/test_6_edited_text.csv')
 train = pd.read_csv('/mnt/shdstorage/for_classification/train_6_edited_text.csv')
 
+# set(a) & set(b)
+
 re1 = re.compile(r'  +')
 
 

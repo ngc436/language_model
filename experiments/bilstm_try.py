@@ -3,11 +3,11 @@
 # pretrained LM for russian: https://github.com/ppleskov/Russian-Language-Model
 
 # to use word dropout
-# from language_model import TimestepDropout
+from language_model import TimestepDropout
 # word_embeddings = Embedding() # first map to embeddings
 # word_embeddings = TimestepDropout(0.10)(word_embeddings) # then zero-out word embeddings
 # word_embeddings = SpatialDropout1D(0.50)(word_embeddings) # and possibly drop some dimensions on every single embedding (timestep)
-
+import time
 
 # /tmp/model.h5,
 import tensorflow as tf
@@ -17,7 +17,15 @@ config.gpu_options.visible_device_list = "0"
 # config.gpu_options.per_process_gpu_memory_fraction = 0.4
 config.allow_soft_placement = True
 config.gpu_options.allow_growth = True
-session = tf.Session(config=config)
+
+flag = False
+while not flag:
+    try:
+        session = tf.Session(config=config)
+        flag = True
+    except:
+        print('Wait 10 sec cuz someone is counting...')
+        time.sleep(10)
 
 from keras.backend.tensorflow_backend import set_session
 from collections import OrderedDict
@@ -63,7 +71,7 @@ batch_size = 128
 # cut words with 1, 2 appearances
 # 61502 in version with no ent
 # 123004 in cut version without entities
-max_features = 60002  # 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 120002  # 60002  # 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100
 emb_dim = 300
 
@@ -81,7 +89,7 @@ verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
 # file:///mnt/shdstorage/tmp/classif_tmp/comments_big_unlem.csv
 #
 
-emb_type = 'w2v'
+emb_type = 'fasttext_2'
 
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
@@ -115,17 +123,17 @@ if isinstance(y_test[0], list):
     y_test = [y[0] for y in y_test]
 y_test = np.asarray(y_test)
 
-X_train = np.load('/mnt/shdstorage/for_classification/trn_ids.npy')
-X_test = np.load('/mnt/shdstorage/for_classification/val_ids.npy')
+X_train = np.load('/mnt/shdstorage/for_classification/trn_ids_120.npy')
+X_test = np.load('/mnt/shdstorage/for_classification/val_ids_120.npy')
 
 X_train = pad_sequences(X_train, maxlen=max_len)
 print('Train params: ', len(X_train), len(y_train))
 X_test = pad_sequences(X_test, maxlen=max_len)
 print('Test params: ', len(X_test), len(y_test))
 
-vocabulary = pickle.load(open('/mnt/shdstorage/for_classification/itos.pkl', 'rb'))
+vocabulary = pickle.load(open('/mnt/shdstorage/for_classification/itos_120.pkl', 'rb'))
 
-verification = np.load('/mnt/shdstorage/for_classification/test_ids.npy')
+verification = np.load('/mnt/shdstorage/for_classification/test_ids_120.npy')
 verification = pad_sequences(verification, maxlen=max_len)
 p.prepare_custom_embedding(vocabulary)
 
@@ -136,28 +144,30 @@ if path_to_goal_sample:
     texts = goal.processed_text.tolist()
     goal = p.prepare_input(texts)
 
-# ======= PARAMS =======
-spatial_dropout = 0.1
+# ============= PARAMS ===============
+spatial_dropout = 0.2
 window_size = 3
-dropout = 0.3
-recurrent_dropout = 0.5
-units = 150  #
+dropout = 0.7
+recurrent_dropout = 0.6
+word_dropout = 0.1
+units = 80  #
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
 bias_constraint = 6
 loss = 'binary_crossentropy'
-optimizer = 'adam'
+optimizer = 'adam'  # changed from adam
 model_type = 'Bidirectional'
-lr = 0.001
+lr = 0.0001
 clipnorm = None
-epochs = 10
+epochs = 50
 weights = True
 trainable = True
 previous_weights = None
 activation = 'sigmoid'
 time_distributed = False
-# ======= =======
+
+# =================================
 
 # ================================ MODEL ==========================================
 
@@ -169,9 +179,10 @@ if weights:
 else:
     model.add(Embedding(max_features, emb_dim))
 
-model.add(SpatialDropout1D(spatial_dropout))
+if word_dropout:
+    model.add(TimestepDropout(word_dropout))
 
-# change activation to none and add batch normalization
+model.add(SpatialDropout1D(spatial_dropout))
 
 model.add(Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout)))
 # model.add(GlobalMaxPool1D())
@@ -201,6 +212,7 @@ print(model.summary())
 # norm = math.sqrt(sum(numpy.sum(K.get_value(w)) for w in model.optimizer.weights))
 
 # print('Loading weights...')
+# # /mnt/shdstorage/for_classification/models_dir/model_1543663988.h5
 # previous_weights = "/mnt/shdstorage/for_classification/models_dir/model_1543663988.h5"
 # model.load_weights(previous_weights)
 
@@ -266,8 +278,8 @@ except:
                 emb_type, emb_dim, trainable, time_distributed))
         f.write('batch size: %s, max features: %s, max len: %s\n' % (
             batch_size, max_features, max_len))
-        f.write('window size: %s, dropout: %s, recurrent dropout: %s, units: %s, activation: %s\n' % (
-            window_size, dropout, recurrent_dropout, units, activation))
+        f.write('window size: %s, dropout: %s, recurrent dropout: %s, word dropout: %s, units: %s, activation: %s\n' % (
+            window_size, dropout, recurrent_dropout, word_dropout, units, activation))
         f.write('loss: %s, optimizer: %s, learning rate: %s, clipnorm: %s, epochs: %s\n' % (
             loss, optimizer, lr, clipnorm, epochs))
         f.write('======= RESULTS =======\n')
