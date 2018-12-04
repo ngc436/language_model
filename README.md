@@ -7,8 +7,9 @@ Current repository contains experiments on language modeling for text classifica
 - [ ] Get TM results
 - [x] Implement QRNN
 - [x] Implement BiQRNN
-- [ ] Implement simple LSTM
-- [ ] Implement BiLSTM
+- [x] Implement simple LSTM
+- [x] Implement BiLSTM
+- [ ] Add CNN model
 - [ ] Add SVM and XgBoost tools
 - [x] Milestone: initial classification results (19 oct.)
 - [x] Implement VAE  
@@ -25,7 +26,7 @@ Current repository contains experiments on language modeling for text classifica
 - [x] Prepare model with fasttext embeddings (1 - without preprocessing)   
 - [x] Prepare model with fasttext embeddings (2 - lemmatized)   
 - [X] Reduce the dictionary and substitute rare words with oov (?)
-- [ ] Change percentage of positive examples in training set (?)
+- [x] Change percentage of positive examples in training set (?)
 - [ ] Tune model with hyperopt
 - [x] Check model_1542229255 on comments with more than 50 tokens
 - [ ] Prepare report on language model
@@ -43,6 +44,9 @@ More data
 - [x] Introduce new train/test/ver v5 
 Cleaner data  
 - [x] Fix dirty data issue (html, phone instead of id)
+- [ ] Create set with source labels (TA, PS_pos, PS_neg, OR_pos, OR_neg ,OT)
+- [ ] Create synonyms replacement 
+- [ ] 
 
 ## List of experiments
 - [ ] BIQRNN fasttext/w2v (time, results, loss plot)
