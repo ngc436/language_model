@@ -23,7 +23,7 @@ idx = [2, 4, 6, 8, 16, 32, 64, 128, 256, 432, 678, 975]
 y_train_labels = '/mnt/shdstorage/for_classification/y_train_5.csv'
 train = pd.read_csv(y_train_labels, header=None).values.tolist()
 for i in idx:
-    print('true label of %s is %s'% (i,train[i][0]))
+    print('true label of %s is %s' % (i, train[i][0]))
 
 path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
 
@@ -39,7 +39,7 @@ for i in idx:
     print()
     print('====================')
     print()
-    print('[%s] text: '%i)
+    print('[%s] text: ' % i)
     print(texts[i])
     print()
 
