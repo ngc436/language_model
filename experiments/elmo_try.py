@@ -59,6 +59,8 @@ from keras import optimizers
 import pandas as pd
 from data import Processor
 
+from deeppavlov.models.embedders.elmo_embedder import ELMoEmbedder
+
 fname_x_batches = '/home/gmaster/projects/other/elmo/embeddings/X_train/'
 fname_y = '/mnt/shdstorage/for_classification/y_train_6_no_ent.csv'
 

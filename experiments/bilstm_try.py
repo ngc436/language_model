@@ -71,7 +71,7 @@ batch_size = 128
 # cut words with 1, 2 appearances
 # 61502 in version with no ent
 # 123004 in cut version without entities
-max_features = 120002  # 60002  # 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 80002  # 60002  # 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100
 emb_dim = 300
 
@@ -82,7 +82,8 @@ y_train_labels = '/mnt/shdstorage/for_classification/y_train_6_no_ent.csv'
 y_test_labels = '/mnt/shdstorage/for_classification/y_test_6_no_ent.csv'
 path_to_goal_sample = None
 
-verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
+# verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
+verification_name = '/mnt/shdstorage/for_classification/test_80.csv'
 # verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
 # path_to_goal_sample = '/mnt/shdstorage/for_classification/new_test.csv'
 # path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
@@ -112,8 +113,13 @@ p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb
 # =============================== try simple modeling on raw text
 
 # old versions: train_raw.csv, test_raw.csv
-y_train = pd.read_csv('/mnt/shdstorage/for_classification/train_6_edited_text.csv')['label'].tolist()
-y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_6_edited_text.csv')['label'].tolist()
+# y_train = pd.read_csv('/mnt/shdstorage/for_classification/train_6_edited_text.csv')['label'].tolist()
+# y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_6_edited_text.csv')['label'].tolist()
+# y_train = pd.read_csv('/mnt/shdstorage/for_classification/train_6_edited_text.csv')['label'].tolist()
+# y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_6_edited_text.csv')['label'].tolist()
+y_train = pd.read_csv('/mnt/shdstorage/for_classification/train_v7.csv')['label'].tolist()
+y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_v7.csv')['label'].tolist()
+
 
 if isinstance(y_train[0], list):
     y_train = [y[0] for y in y_train]
@@ -123,19 +129,24 @@ if isinstance(y_test[0], list):
     y_test = [y[0] for y in y_test]
 y_test = np.asarray(y_test)
 
-X_train = np.load('/mnt/shdstorage/for_classification/trn_ids_120.npy')
-X_test = np.load('/mnt/shdstorage/for_classification/val_ids_120.npy')
+print(y_train[:10])
+print(y_test[:10])
+
+X_train = np.load('/mnt/shdstorage/for_classification/trn_ids_v7_no_ent.npy')
+X_test = np.load('/mnt/shdstorage/for_classification/test_ids_v7_no_ent.npy')
 
 X_train = pad_sequences(X_train, maxlen=max_len)
 print('Train params: ', len(X_train), len(y_train))
 X_test = pad_sequences(X_test, maxlen=max_len)
 print('Test params: ', len(X_test), len(y_test))
 
-vocabulary = pickle.load(open('/mnt/shdstorage/for_classification/itos_120.pkl', 'rb'))
+voc_name = '/mnt/shdstorage/for_classification/itos_80_no_ent.pkl'
 
-verification = np.load('/mnt/shdstorage/for_classification/test_ids_120.npy')
+vocabulary = pickle.load(open(voc_name, 'rb'))
+
+verification = np.load('/mnt/shdstorage/for_classification/ver_ids_v7_no_ent.npy')
 verification = pad_sequences(verification, maxlen=max_len)
-p.prepare_custom_embedding(vocabulary)
+p.prepare_custom_embedding(vocabulary, x_train_name=voc_name.split('/')[-1].split('.')[0])
 
 # =================================== end of test block
 
@@ -145,12 +156,12 @@ if path_to_goal_sample:
     goal = p.prepare_input(texts)
 
 # ============= PARAMS ===============
-spatial_dropout = 0.2
+spatial_dropout = 0.3
 window_size = 3
-dropout = 0.7
+dropout = 0.1
 recurrent_dropout = 0.6
-word_dropout = 0.1
-units = 80  #
+word_dropout = 0.5
+units = 100  #
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
@@ -160,14 +171,14 @@ optimizer = 'adam'  # changed from adam
 model_type = 'Bidirectional'
 lr = 0.0001
 clipnorm = None
-epochs = 50
+epochs = 30
 weights = True
 trainable = True
 previous_weights = None
 activation = 'sigmoid'
 time_distributed = False
 
-# =================================
+# ======================================
 
 # ================================ MODEL ==========================================
 
@@ -187,7 +198,6 @@ model.add(SpatialDropout1D(spatial_dropout))
 model.add(Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout)))
 # model.add(GlobalMaxPool1D())
 # model.add(Dense(1, activation=activation))
-# model.add(BatchNormalization()) #?
 model.add(Dropout(dropout))
 model.add(Dense(1, activation=activation))
 
@@ -370,7 +380,8 @@ if path_to_goal_sample:
 #     print()
 
 
-# ====== compute feature importance with LIME ======
+# ================= compute feature importance with LIME =================
+
 from lime.lime_text import LimeTextExplainer
 
 
