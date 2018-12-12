@@ -106,17 +106,17 @@ class TextTokenizer:
         self.stoi = collections.defaultdict(lambda: 0, {v: k for k, v in enumerate(self.itos)})
 
 
-ver = pd.read_csv('/mnt/shdstorage/for_classification/new_test.csv')
-
-print(ver['edited_text_old'])
-
-ver['edited_text'] = ver['edited_text_old'].apply(fixup_2)
-ver.to_csv('/mnt/shdstorage/for_classification/new_test.csv')
-
-# train = pd.read_csv('/mnt/shdstorage/for_classification/train_v7.csv')
-# test = pd.read_csv('/mnt/shdstorage/for_classification/test_v7.csv')
 # ver = pd.read_csv('/mnt/shdstorage/for_classification/new_test.csv')
 #
+# print(ver['edited_text_old'])
+#
+# ver['edited_text'] = ver['edited_text_old'].apply(fixup_2)
+# ver.to_csv('/mnt/shdstorage/for_classification/new_test.csv')
+
+train = pd.read_csv('/mnt/shdstorage/for_classification/train_v7.csv')
+test = pd.read_csv('/mnt/shdstorage/for_classification/test_v7.csv')
+ver = pd.read_csv('/mnt/shdstorage/for_classification/new_test.csv')
+
 # tt = TextTokenizer(voc_size=80000, min_freq=2)
 #
 # tok_trn, trn_labels = tt.get_tokens(train)
@@ -139,32 +139,57 @@ ver.to_csv('/mnt/shdstorage/for_classification/new_test.csv')
 # pickle.dump(tt.itos, open('/mnt/shdstorage/for_classification/itos_80_no_ent_v7.pkl', 'wb'))
 #
 # raise ValueError
-#
-# itos = pickle.load(open('/mnt/shdstorage/for_classification/itos_80_no_ent.pkl', 'rb'))
+
+itos = pickle.load(open('/mnt/shdstorage/for_classification/itos_80_no_ent_v7.pkl', 'rb'))
+
 # print(itos[:100])
 #
-# vs = len(itos)
-#
-# em_sz, nh, nl = 400, 1150, 3
+
+vs = len(itos)
+em_sz, nh, nl = 400, 1150, 3
+
 #
 # # lm4.h5  lm_enc4.h5
 #
-# PRE_LM_PATH = '/mnt/shdstorage/for_classification/weights/lm4.h5'
-# lm_itos = '/mnt/shdstorage/for_classification/itos.pkl'
-#
-# wgts = torch.load(PRE_LM_PATH, map_location=lambda storage, loc: storage)
-# enc_wgts = np.array(wgts['0.encoder.weight'])
-# row_m = enc_wgts.mean(0)
-# itos2 = pickle.load(open(lm_itos, 'rb'))
-# stoi2 = collections.defaultdict(lambda: -1, {v: k for k, v in enumerate(itos2)})
-#
-# new_w = np.zeros((vs, em_sz), dtype=np.float32)
-# for i, w in enumerate(itos):
-#     r = stoi2[w]
-#     new_w[i] = enc_wgts[r] if r >= 0 else row_m
-#
+
+PRE_LM_PATH = '/mnt/shdstorage/for_classification/weights/lm4.h5'
+lm_itos = '/mnt/shdstorage/for_classification/itos.pkl'
+
+wgts = torch.load(PRE_LM_PATH, map_location=lambda storage, loc: storage)
+enc_wgts = np.array(wgts['0.encoder.weight'])
+row_m = enc_wgts.mean(0)
+itos2 = pickle.load(open(lm_itos, 'rb'))
+stoi2 = collections.defaultdict(lambda: -1, {v: k for k, v in enumerate(itos2)})
+
+new_w = np.zeros((vs, em_sz), dtype=np.float32)
+for i, w in enumerate(itos):
+    r = stoi2[w]
+    new_w[i] = enc_wgts[r] if r >= 0 else row_m
+
 # wgts['0.encoder.weight'] = T(new_w)
 # wgts['0.encoder_with_dropout.embed.weight'] = T(np.copy(new_w))
 # wgts['1.decoder.weight'] = T(np.copy(new_w))
 #
 # # pre lm path
+
+train_df = train[['label', 'edited_text']]
+train_df = train_df.rename(columns={'edited_text': 'text'})
+
+test_df = test[['label', 'edited_text']]
+test_df = test_df.rename(columns={'edited_text': 'text'})
+
+data_lm = TextLMDataBunch.from_df(train_df=train_df, valid_df=test_df, path="")
+data_clas = TextClasDataBunch.from_df(path='', train_df=train_df, valid_df=test_df,
+                                      vocab=data_lm.train_ds.vocab, bs=32)
+
+# language model
+learn = language_model_learner(data_lm, pretrained_model=PRE_LM_PATH, drop_mult=0.7)
+print(learn.fit_one_cycle(1, 1e-2))
+
+# classifier
+learn = text_classifier_learner(data_clas, drop_mult=0.7)
+learn.fit_one_cycle(1, 1e-2)
+
+preds, targets = learn.get_preds()
+predictions = np.argmax(preds, axis=1)
+pd.crosstab(predictions, targets)

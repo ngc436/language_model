@@ -1,3 +1,5 @@
+# TODO: add verification results printing
+
 import pickle
 import numpy as np
 import pandas as pd
@@ -51,6 +53,7 @@ y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_v7.csv')['label'].
 
 X_train = pickle.load(open('/mnt/shdstorage/for_classification/elmo/train_v7.pkl', 'rb'))
 X_test = pickle.load(open('/mnt/shdstorage/for_classification/elmo/test_v7.pkl', 'rb'))
+X_ver = pickle.load(open('/mnt/shdstorage/for_classification/elmo/ver_v7.pkl', 'rb'))
 
 ff = np.zeros((len(X_train), 1024))
 for i in range(len(X_train)):
@@ -62,6 +65,11 @@ for i in range(len(X_test)):
     ff[i] = X_test[i][0]
 X_test = ff
 
+ff = np.zeros((len(X_ver), 1024))
+for i in range(len(X_ver)):
+    ff[i] = X_ver[i][0]
+X_ver = ff
+
 if isinstance(y_train[0], list):
     y_train = [y[0] for y in y_train]
 y_train = np.asarray(y_train)
@@ -71,22 +79,21 @@ if isinstance(y_test[0], list):
 y_test = np.asarray(y_test)
 
 # ============= PARAMS ===============
-spatial_dropout = 0.3
 window_size = 3
 dropout = 0.1
-recurrent_dropout = 0.6
+recurrent_dropout = 0.1
 word_dropout = None
 units = 100  #
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
 bias_constraint = 6
-loss = 'binary_crossentropy'
+loss = 'binary_crossentropy' #
 optimizer = 'adam'  # changed from adam
 model_type = 'Bidirectional'
-lr = 0.0001
+lr = 0.001
 clipnorm = None
-epochs = 30
+epochs = 5
 weights = True
 trainable = True
 previous_weights = None
@@ -102,8 +109,11 @@ model = Sequential()
 
 # model.add(SpatialDropout1D(spatial_dropout))
 
-model.add(
-    Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout), input_shape=(1, 1024)))
+# model.add(
+#     Bidirectional(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout), batch_size=batch_size,
+#                   input_shape=(1024, 1)))
+model.add(LSTM(units, dropout=dropout, recurrent_dropout=recurrent_dropout, batch_size=batch_size,
+                  input_shape=(1024, 1)))
 # model.add(GlobalMaxPool1D())
 # model.add(Dense(1, activation=activation))
 model.add(Dropout(dropout))
@@ -127,9 +137,24 @@ print(model.summary())
 
 # ================================== END ============================================
 
+# ================================== RESHAPING ======================================
+
+
+X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
+X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
+X_ver = np.reshape(X_ver, (X_ver.shape[0], X_ver.shape[1], 1))
+
 # making timesteps to be one
-X_train = np.reshape(X_train, (X_train.shape[0], 1, X_train.shape[1]))
-X_test = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
+# X_train = np.reshape(X_train, (X_train.shape[0], 1, X_train.shape[1]))
+# X_test = np.reshape(X_test, (X_test.shape[0], 1, X_test.shape[1]))
+# X_ver = np.reshape(X_ver, (X_ver.shape[0], 1, X_ver.shape[1]))
+
+
+# ===================================================================================
+
+# print('Loading weights...')
+# previous_weights = "/mnt/shdstorage/for_classification/models_dir/model_1544540767.h5"
+# model.load_weights(previous_weights)
 
 fit = True
 if fit:
@@ -150,3 +175,20 @@ else:
     timing = previous_weights.split('/')[-1].split('_')[-1].split('.')[0]
 
 score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
+
+print('Test score:', score)
+print('Test accuracy:', acc)
+
+train_res = model.predict_classes(X_train)
+train_res = [i[0] for i in train_res]
+train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
+
+test_res = model.predict_classes(X_test)
+test_res = [i[0] for i in test_res]
+test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
+
+ver_res = model.predict_classes(X_ver)
+data = pd.read_csv('/mnt/shdstorage/for_classification/new_test.csv')
+label = data['label'].tolist()
+ver_res = [i[0] for i in ver_res]
+verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION')
