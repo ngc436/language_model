@@ -59,24 +59,34 @@ ff = np.zeros((len(X_train), 1024))
 for i in range(len(X_train)):
     ff[i] = X_train[i][0]
 X_train = ff
+X_train = X_train[:(len(X_train)//batch_size)*batch_size, :]
 
 ff = np.zeros((len(X_test), 1024))
 for i in range(len(X_test)):
     ff[i] = X_test[i][0]
 X_test = ff
+X_test = X_test[:(len(X_test)//batch_size)*batch_size, :]
 
 ff = np.zeros((len(X_ver), 1024))
 for i in range(len(X_ver)):
     ff[i] = X_ver[i][0]
 X_ver = ff
 
+X_train = pickle.load(open('/mnt/shdstorage/for_classification/elmo/elmo_sent_train_v7.pkl', 'rb'))
+X_train = X_train[:(len(X_train)//batch_size)*batch_size]
+X_test = pickle.load(open('/mnt/shdstorage/for_classification/elmo/elmo_sent_test_v7.pkl', 'rb'))
+X_test = X_test[:(len(X_test)//batch_size)*batch_size]
+X_ver = pickle.load(open('/mnt/shdstorage/for_classification/elmo/elmo_sent_ver.pkl', 'rb'))
+
 if isinstance(y_train[0], list):
     y_train = [y[0] for y in y_train]
 y_train = np.asarray(y_train)
+y_train =y_train[:(len(y_train)//batch_size)*batch_size]
 
 if isinstance(y_test[0], list):
     y_test = [y[0] for y in y_test]
 y_test = np.asarray(y_test)
+y_test = y_test[:(len(y_test)//batch_size)*batch_size]
 
 # ============= PARAMS ===============
 window_size = 3

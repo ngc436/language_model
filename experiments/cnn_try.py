@@ -75,7 +75,7 @@ print('Test params: ', len(X_test), len(y_test))
 
 vocabulary = pickle.load(open('/mnt/shdstorage/for_classification/itos.pkl', 'rb'))
 
-verification = np.load('/mnt/shdstorage/for_classification/test_ids.npy')
+verification = np.load('/mnt/shdstorage/for_classification/tok_ver_60.npy')
 verification = pad_sequences(verification, maxlen=max_len)
 p.prepare_custom_embedding(vocabulary, x_train_name=x_train_name)
 
@@ -127,33 +127,33 @@ if fit:
     model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
               callbacks=callbacks_list)
 
-path_to_weights = '/mnt/shdstorage/for_classification/models_dir/model_%s.h5' % (timing)
-path_to_architecture = "/mnt/shdstorage/for_classification/models_dir/architecture/model_%s.h5"
-model.save_weights(path_to_weights)
-model.save(path_to_architecture)
-print('Model is saved %s' % path_to_weights)
+    path_to_weights = '/mnt/shdstorage/for_classification/models_dir/model_%s.h5' % (timing)
+    path_to_architecture = "/mnt/shdstorage/for_classification/models_dir/architecture/model_%s.h5"
+    model.save_weights(path_to_weights)
+    model.save(path_to_architecture)
+    print('Model is saved %s' % path_to_weights)
 
-score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
-
-print('Test score:', score)
-print('Test accuracy:', acc)
+# score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
+#
+# print('Test score:', score)
+# print('Test accuracy:', acc)
 
 # ================= PRINT METRICS ======================
 
-train_res = model.predict(X_train)
-train_res = [i[0] for i in train_res]
-train_res = [1 if i > 0.5 else 0 for i in train_res]
-train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
-
-test_res = model.predict(X_test)
-test_res = [i[0] for i in test_res]
-test_res = [1 if i > 0.5 else 0 for i in test_res]
-test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
+# train_res = model.predict(X_train)
+# train_res = [i[0] for i in train_res]
+# train_res = [1 if i > 0.5 else 0 for i in train_res]
+# train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
+#
+# test_res = model.predict(X_test)
+# test_res = [i[0] for i in test_res]
+# test_res = [1 if i > 0.5 else 0 for i in test_res]
+# test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
 
 ver_res = model.predict(verification)
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
-label = data['label'].tolist()
+label = data['negative'].tolist()
 ver_res = [i[0] for i in ver_res]
 ver_res = [1 if i > 0.5 else 0 for i in ver_res]
 verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION')

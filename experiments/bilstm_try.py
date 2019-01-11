@@ -71,7 +71,7 @@ batch_size = 128
 # cut words with 1, 2 appearances
 # 61502 in version with no ent
 # 123004 in cut version without entities
-max_features = 80002  # 60002  # 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
+max_features = 120002  # 60002  # 224465  # 291837  # 172567 in the 3rd version # 228654 in the 4th version
 max_len = 100
 emb_dim = 300
 
@@ -82,8 +82,8 @@ y_train_labels = '/mnt/shdstorage/for_classification/y_train_6_no_ent.csv'
 y_test_labels = '/mnt/shdstorage/for_classification/y_test_6_no_ent.csv'
 path_to_goal_sample = None
 
-# verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
-verification_name = '/mnt/shdstorage/for_classification/test_80.csv'
+verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
+# verification_name = '/mnt/shdstorage/for_classification/test_80.csv'
 # verification_name = '/mnt/shdstorage/tmp/verification_big.csv'
 # path_to_goal_sample = '/mnt/shdstorage/for_classification/new_test.csv'
 # path_to_goal_sample = '/mnt/shdstorage/tmp/classif_tmp/comments_big.csv'
@@ -101,7 +101,7 @@ y_test = pd.read_csv(y_test_labels, header=None).values.tolist()
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
 # TODO: add processed_text_no_tags column
-texts = data.processed_text.tolist()
+texts = data.edited_text.tolist()
 
 p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
 # p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name, other=texts)
@@ -117,36 +117,55 @@ p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb
 # y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_6_edited_text.csv')['label'].tolist()
 # y_train = pd.read_csv('/mnt/shdstorage/for_classification/train_6_edited_text.csv')['label'].tolist()
 # y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_6_edited_text.csv')['label'].tolist()
-y_train = pd.read_csv('/mnt/shdstorage/for_classification/train_v7.csv')['label'].tolist()
-y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_v7.csv')['label'].tolist()
-
-
-if isinstance(y_train[0], list):
-    y_train = [y[0] for y in y_train]
-y_train = np.asarray(y_train)
-
-if isinstance(y_test[0], list):
-    y_test = [y[0] for y in y_test]
-y_test = np.asarray(y_test)
-
-print(y_train[:10])
-print(y_test[:10])
-
-X_train = np.load('/mnt/shdstorage/for_classification/trn_ids_v7_no_ent.npy')
-X_test = np.load('/mnt/shdstorage/for_classification/test_ids_v7_no_ent.npy')
-
-X_train = pad_sequences(X_train, maxlen=max_len)
-print('Train params: ', len(X_train), len(y_train))
-X_test = pad_sequences(X_test, maxlen=max_len)
-print('Test params: ', len(X_test), len(y_test))
-
-voc_name = '/mnt/shdstorage/for_classification/itos_80_no_ent.pkl'
-
+# y_train = pd.read_csv('/mnt/shdstorage/for_classification/train_v7.csv')['label'].tolist()
+# y_test = pd.read_csv('/mnt/shdstorage/for_classification/test_v7.csv')['label'].tolist()
+#
+#
+# if isinstance(y_train[0], list):
+#     y_train = [y[0] for y in y_train]
+# y_train = np.asarray(y_train)
+#
+# if isinstance(y_test[0], list):
+#     y_test = [y[0] for y in y_test]
+# y_test = np.asarray(y_test)
+#
+# print(y_train[:10])
+# print(y_test[:10])
+#
+# X_train = np.load('/mnt/shdstorage/for_classification/trn_ids_v7_no_ent.npy')
+# X_test = np.load('/mnt/shdstorage/for_classification/test_ids_v7_no_ent.npy')
+#
+# X_train = pad_sequences(X_train, maxlen=max_len)
+# print('Train params: ', len(X_train), len(y_train))
+# X_test = pad_sequences(X_test, maxlen=max_len)
+# print('Test params: ', len(X_test), len(y_test))
+#
+voc_name = '/mnt/shdstorage/for_classification/itos_120_test.pkl'
+#
 vocabulary = pickle.load(open(voc_name, 'rb'))
-
-verification = np.load('/mnt/shdstorage/for_classification/ver_ids_v7_no_ent.npy')
+#
+verification = np.load('/mnt/shdstorage/for_classification/tok_ver_120_test.npy')
+print(verification.shape)
 verification = pad_sequences(verification, maxlen=max_len)
 p.prepare_custom_embedding(vocabulary, x_train_name=voc_name.split('/')[-1].split('.')[0])
+
+# =================================================
+# train_set = pd.read_csv('/mnt/shdstorage/for_classification/train_v7.csv')
+# test_set = pd.read_csv('/mnt/shdstorage/for_classification/test_v7.csv')
+# train_set = train_set[~train_set['processed_text'].isna()]
+# test_set = test_set[~test_set['processed_text'].isna()]
+#
+# y_train = train_set['label'].values.tolist()
+# y_test = test_set['label'].values.tolist()
+#
+# X_train = train_set['processed_text'].values.tolist()
+# X_test = test_set['processed_text'].values.tolist()
+
+# p.fit_processor(x_train=X_train, x_train_name=x_train_name, other=texts)
+# X_train, y_train = p.prepare_input(X_train, y_train)
+# X_test, y_test = p.prepare_input(X_test, y_test)
+
+# verification = p.prepare_input(texts)
 
 # =================================== end of test block
 
@@ -156,12 +175,12 @@ if path_to_goal_sample:
     goal = p.prepare_input(texts)
 
 # ============= PARAMS ===============
-spatial_dropout = 0.3
+spatial_dropout = 0.1
 window_size = 3
 dropout = 0.1
-recurrent_dropout = 0.6
-word_dropout = 0.5
-units = 100  #
+recurrent_dropout = 0.3
+word_dropout = None
+units = 80  #
 kernel_regularizer = 1e-6
 bias_regularizer = 1e-6
 kernel_constraint = 6
@@ -169,7 +188,7 @@ bias_constraint = 6
 loss = 'binary_crossentropy'
 optimizer = 'adam'  # changed from adam
 model_type = 'Bidirectional'
-lr = 0.0001
+lr = 0.001
 clipnorm = None
 epochs = 30
 weights = True
@@ -222,11 +241,11 @@ print(model.summary())
 # norm = math.sqrt(sum(numpy.sum(K.get_value(w)) for w in model.optimizer.weights))
 
 # print('Loading weights...')
-# # /mnt/shdstorage/for_classification/models_dir/model_1543663988.h5
-# previous_weights = "/mnt/shdstorage/for_classification/models_dir/model_1543663988.h5"
-# model.load_weights(previous_weights)
+# # /mnt/shdstorage/for_classification/mod0.911els_dir/model_1543663988.h5
+previous_weights = "/mnt/shdstorage/for_classification/models_dir/model_1543958541.h5"
+model.load_weights(previous_weights)
 
-fit = True
+fit = False
 if fit:
     print('Train...')
     model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
@@ -244,27 +263,29 @@ if fit:
 else:
     timing = previous_weights.split('/')[-1].split('_')[-1].split('.')[0]
 
-score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
-
-print('Test score:', score)
-print('Test accuracy:', acc)
+# score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
+#
+# print('Test score:', score)
+# print('Test accuracy:', acc)
 
 # ============================== PRINT METRICS =====================================
 
-train_res = model.predict_classes(X_train)
-train_res = [i[0] for i in train_res]
-train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
-
-test_res = model.predict_classes(X_test)
-test_res = [i[0] for i in test_res]
-test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
+# train_res = model.predict_classes(X_train)
+# train_res = [i[0] for i in train_res]
+# train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
+#
+# test_res = model.predict_classes(X_test)
+# test_res = [i[0] for i in test_res]
+# test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
 
 ver_res = model.predict_classes(verification)
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
-label = data['label'].tolist()
+label = data['negative'].tolist()
 ver_res = [i[0] for i in ver_res]
 verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION')
+for i in range(len(label)):
+    print(i, label[i], ver_res[i])
 
 # ======================= LOGS =======================
 
