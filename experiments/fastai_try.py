@@ -12,6 +12,20 @@ import torchvision
 
 re1 = re.compile(r'  +')
 
+import tensorflow as tf
+
+config = tf.ConfigProto()
+config.gpu_options.visible_device_list = "1"
+config.allow_soft_placement = True
+config.gpu_options.allow_growth = True
+
+session = tf.Session(config=config)
+
+from keras.backend.tensorflow_backend import set_session
+from collections import OrderedDict
+
+set_session(session)
+
 
 def fixup(x):
     x = x.replace('#39;', "'").replace('amp;', '&').replace('#146;', "'").replace(
@@ -26,7 +40,8 @@ def fixup(x):
         'section', ' ').replace('search', ' ').replace('css', ' ').replace('style', ' ').replace(
         'cc', ' ').replace('date', ' ').replace('org', ' ').replace('phone', ' ').replace(
         'address', ' ').replace('name', ' ').replace('\n', '').replace('\r', '').replace(
-        '|', '').replace('id', ' ').replace('[', '').replace(']', '').replace('span')
+        '|', '').replace('id', ' ').replace('[', '').replace(']', '').replace('span', ' ')
+
     return re1.sub(' ', html.unescape(x))
 
 
@@ -106,43 +121,81 @@ class TextTokenizer:
         self.stoi = collections.defaultdict(lambda: 0, {v: k for k, v in enumerate(self.itos)})
 
 
-# ver = pd.read_csv('/mnt/shdstorage/for_classification/new_test.csv')
-#
+class Tokenizator:
+
+    def __init__(self, voc_size=60000, min_freq=2):
+        self.tt = TextTokenizer(voc_size=voc_size, min_freq=min_freq)
+
+    # set mode to 'train' to create ids set
+    def prepare_set(self, set_fname, mode=None):
+        set = pd.read_csv(set_fname, encoding='utf-8')
+        tok, labels = self.tt.get_tokens(set)
+        if mode == 'train':
+            self.tt.ids(tok)
+        lm = np.array([[self.tt.stoi[o] for o in p] for p in tok])
+        return tok, labels, lm
+
+
+# the function to convert h5 model to pth
+def convert(path_to_old_model, path_to_save_converted_model):
+    """
+    path_to_old_model is the path to old model
+    and
+    path_to_save_converted_model is the path where the converted model is stored
+    """
+    old_wgts = torch.load(path_to_old_model, map_location=lambda storage, loc: storage)
+    new_wgts = OrderedDict()
+    new_wgts['encoder.weight'] = old_wgts['0.encoder.weight']
+    new_wgts['0.encoder.weight'] = old_wgts['0.encoder.weight']
+    new_wgts['encoder_dp.emb.weight'] = old_wgts['0.encoder_with_dropout.embed.weight']
+    new_wgts['rnns.0.weight_hh_l0_raw'] = old_wgts['0.rnns.0.module.weight_hh_l0_raw']
+    new_wgts['rnns.0.module.weight_ih_l0'] = old_wgts['0.rnns.0.module.weight_ih_l0']
+    new_wgts['rnns.0.module.weight_hh_l0'] = old_wgts['0.rnns.0.module.weight_hh_l0_raw']
+    new_wgts['rnns.0.module.bias_ih_l0'] = old_wgts['0.rnns.0.module.bias_ih_l0']
+    new_wgts['rnns.0.module.bias_hh_l0'] = old_wgts['0.rnns.0.module.bias_hh_l0']
+    new_wgts['rnns.1.weight_hh_l0_raw'] = old_wgts['0.rnns.1.module.weight_hh_l0_raw']
+    new_wgts['rnns.1.module.weight_ih_l0'] = old_wgts['0.rnns.1.module.weight_ih_l0']
+    new_wgts['rnns.1.module.weight_hh_l0'] = old_wgts['0.rnns.1.module.weight_hh_l0_raw']
+    new_wgts['rnns.1.module.bias_ih_l0'] = old_wgts['0.rnns.1.module.bias_ih_l0']
+    new_wgts['rnns.1.module.bias_hh_l0'] = old_wgts['0.rnns.1.module.bias_hh_l0']
+    new_wgts['rnns.2.weight_hh_l0_raw'] = old_wgts['0.rnns.2.module.weight_hh_l0_raw']
+    new_wgts['rnns.2.module.weight_ih_l0'] = old_wgts['0.rnns.2.module.weight_ih_l0']
+    new_wgts['rnns.2.module.weight_hh_l0'] = old_wgts['0.rnns.2.module.weight_hh_l0_raw']
+    new_wgts['rnns.2.module.bias_ih_l0'] = old_wgts['0.rnns.2.module.bias_ih_l0']
+    new_wgts['rnns.2.module.bias_hh_l0'] = old_wgts['0.rnns.2.module.bias_hh_l0']
+    new_wgts['1.decoder.bias'] = old_wgts['1.decoder.weight']
+
+    torch.save(new_wgts, path_to_save_converted_model + 'lm4.pth')
+
+convert('/home/gmaster/projects/negRevClassif/pretrained_lm/lm4.h5', '/home/gmaster/projects/negRevClassif/pretrained_lm/')
+
+
 # print(ver['edited_text_old'])
 #
 # ver['edited_text'] = ver['edited_text_old'].apply(fixup_2)
 # ver.to_csv('/mnt/shdstorage/for_classification/new_test.csv')
 
-train = pd.read_csv('/mnt/shdstorage/for_classification/train_v7.csv')
-test = pd.read_csv('/mnt/shdstorage/for_classification/test_v7.csv')
-ver = pd.read_csv('/mnt/shdstorage/for_classification/new_test.csv')
+# tokenizer = Tokenizator()
+#
+train_fname = '/home/gmaster/projects/negRevClassif/source_datasets/train_v7.csv'
+test_fname = '/home/gmaster/projects/negRevClassif/source_datasets/test_v7.csv'
+ver_fname = '/home/gmaster/projects/negRevClassif/source_datasets/new_test.csv'
+#
+# #
+# tok_trn, trn_labels, trn_lm = tokenizer.prepare_set(train_fname, mode='train')
+# tok_test, test_labels, test_lm = tokenizer.prepare_set(test_fname)
+# tok_ver, ver_labels, ver_lm = tokenizer.prepare_set(ver_fname)
+#
+# np.save('/home/gmaster/projects/negRevClassif/source_datasets/trn_ids_60_tt.npy', trn_lm)
+# np.save('/home/gmaster/projects/negRevClassif/source_datasets/test_ids_60_tt.npy', test_lm)
+# np.save('/home/gmaster/projects/negRevClassif/source_datasets/ver_ids_60_tt.npy', ver_lm)
+# pickle.dump(tokenizer.tt.itos, open('/home/gmaster/projects/negRevClassif/source_datasets/itos_60_tt.pkl', 'wb'))
+#
 
-# tt = TextTokenizer(voc_size=80000, min_freq=2)
-#
-# tok_trn, trn_labels = tt.get_tokens(train)
-# tok_test, test_labels = tt.get_tokens(test)
-# tok_ver, ver_labels = tt.get_tokens(ver)
-#
-# np.save('/mnt/shdstorage/for_classification/tok_trn_80_no_ent_v7.npy', tok_trn)
-# np.save('/mnt/shdstorage/for_classification/tok_ver_80_no_ent_v7.npy', tok_ver)
-# np.save('/mnt/shdstorage/for_classification/tok_test_80_no_ent_v7.npy', tok_test)
-#
-# tt.ids(tok_trn)
-#
-# trn_lm = np.array([[tt.stoi[o] for o in p] for p in tok_trn])
-# ver_lm = np.array([[tt.stoi[o] for o in p] for p in tok_ver])
-# test_lm = np.array([[tt.stoi[o] for o in p] for p in tok_test])
-#
-# np.save('/mnt/shdstorage/for_classification/trn_ids_80_no_ent_v7.npy', trn_lm)
-# np.save('/mnt/shdstorage/for_classification/ver_ids_80_no_ent_v7.npy', ver_lm)
-# np.save('/mnt/shdstorage/for_classification/test_ids_80_no_ent_v7.npy', test_lm)
-# pickle.dump(tt.itos, open('/mnt/shdstorage/for_classification/itos_80_no_ent_v7.pkl', 'wb'))
-#
-# raise ValueError
+# itos = tokenizer.tt.itos
+itos = pickle.load(open('/home/gmaster/projects/negRevClassif/source_datasets/itos_60_tt.pkl', 'rb'))
 
-itos = pickle.load(open('/mnt/shdstorage/for_classification/itos_80_no_ent_v7.pkl', 'rb'))
-
-# print(itos[:100])
+print(itos[:100])
 #
 
 vs = len(itos)
@@ -150,40 +203,49 @@ em_sz, nh, nl = 400, 1150, 3
 
 #
 # # lm4.h5  lm_enc4.h5
+
+PRE_LM_PATH = '/home/gmaster/projects/negRevClassif/pretrained_lm/lm4'
+lm_itos = '/home/gmaster/projects/negRevClassif/pretrained_lm/itos'
+
+# wgts = torch.load(PRE_LM_PATH, map_location=lambda storage, loc: storage)
+# enc_wgts = np.array(wgts['0.encoder.weight'])
+# row_m = enc_wgts.mean(0)
+# itos2 = pickle.load(open(lm_itos, 'rb'))
+# stoi2 = collections.defaultdict(lambda: -1, {v: k for k, v in enumerate(itos2)})
 #
-
-PRE_LM_PATH = '/mnt/shdstorage/for_classification/weights/lm4.h5'
-lm_itos = '/mnt/shdstorage/for_classification/itos.pkl'
-
-wgts = torch.load(PRE_LM_PATH, map_location=lambda storage, loc: storage)
-enc_wgts = np.array(wgts['0.encoder.weight'])
-row_m = enc_wgts.mean(0)
-itos2 = pickle.load(open(lm_itos, 'rb'))
-stoi2 = collections.defaultdict(lambda: -1, {v: k for k, v in enumerate(itos2)})
-
-new_w = np.zeros((vs, em_sz), dtype=np.float32)
-for i, w in enumerate(itos):
-    r = stoi2[w]
-    new_w[i] = enc_wgts[r] if r >= 0 else row_m
-
-# wgts['0.encoder.weight'] = T(new_w)
-# wgts['0.encoder_with_dropout.embed.weight'] = T(np.copy(new_w))
-# wgts['1.decoder.weight'] = T(np.copy(new_w))
+# new_w = np.zeros((vs, em_sz), dtype=np.float32)
+# for i, w in enumerate(itos.pkl):
+#     r = stoi2[w]
+#     new_w[i] = enc_wgts[r] if r >= 0 else row_m
 #
-# # pre lm path
+# wgts['0.encoder.weight'] = torch.from_numpy(new_w)
+# wgts['0.encoder_with_dropout.embed.weight'] = torch.from_numpy(np.copy(new_w))
+# wgts['1.decoder.weight'] = torch.from_numpy(np.copy(new_w))
 
+# opt_fn = partial(optim.Adam, betas=(0.8, 0.99))
+
+train = pd.read_csv(train_fname)
 train_df = train[['label', 'edited_text']]
 train_df = train_df.rename(columns={'edited_text': 'text'})
 
+test = pd.read_csv(test_fname)
 test_df = test[['label', 'edited_text']]
 test_df = test_df.rename(columns={'edited_text': 'text'})
+print('Datasets are ready!')
 
 data_lm = TextLMDataBunch.from_df(train_df=train_df, valid_df=test_df, path="")
 data_clas = TextClasDataBunch.from_df(path='', train_df=train_df, valid_df=test_df,
                                       vocab=data_lm.train_ds.vocab, bs=32)
+print('Bunches are ready!')
+#
+# data_lm.save('/home/gmaster/projects/negRevClassif/data/')
+# data_clas.save('/home/gmaster/projects/negRevClassif/data/')
+
+# data_lm = TextLMDataBunch.load('/home/gmaster/projects/negRevClassif/data/')
+# data_clas = TextClasDataBunch.load('/home/gmaster/projects/negRevClassif/data/', bs=32)
 
 # language model
-learn = language_model_learner(data_lm, pretrained_model=PRE_LM_PATH, drop_mult=0.7)
+learn = language_model_learner(data_lm, pretrained_fnames=[PRE_LM_PATH, lm_itos], drop_mult=0.7)
 print(learn.fit_one_cycle(1, 1e-2))
 
 # classifier
@@ -193,3 +255,4 @@ learn.fit_one_cycle(1, 1e-2)
 preds, targets = learn.get_preds()
 predictions = np.argmax(preds, axis=1)
 pd.crosstab(predictions, targets)
+

@@ -25,7 +25,7 @@ morph = pymorphy2.MorphAnalyzer()
 
 # path_to_model = '/tmp/web_0_300_20.bin'
 # TODO: find out what's wrong with tayga corpora
-path_to_w2v = '/home/gmaster/projects/negRevClassif/data/embeddings/ruwikiruscorpora_upos_skipgram_300_2_2018.vec'
+path_to_w2v = '/home/gmaster/projects/negRevClassif/data/embeddings/ embeddings.vec'
 path_to_fasttext_emb = '/tmp/wiki.ru.bin'
 path_to_fasttext_emb_2 = '/home/gmaster/projects/negRevClassif/data/embeddings/ft_native_300_ru_wiki_lenta_lemmatize.bin'
 path_to_fasttext_unlem = '/tmp/ft_native_300_ru_wiki_lenta_lower_case.bin'
@@ -147,7 +147,7 @@ class Processor:
 
         return embedding_matrix
 
-    def fit_processor(self, x_train, x_test, x_train_name, other=None):
+    def fit_processor(self, x_train, x_train_name, other=None):
         self.x_train_name = x_train_name
         try:
             self.embedding_matrix = np.load(
@@ -161,14 +161,13 @@ class Processor:
         except:  # to check
             print('No model found...initialization...')
             x_train = [sent[0] for sent in x_train]
-            x_test = [sent[0] for sent in x_test]
             self.tokenizer = Tokenizer(num_words=self.max_features + 1, oov_token='oov')
             if not other:
-                self.tokenizer.fit_on_texts(x_train + x_test)
+                self.tokenizer.fit_on_texts(x_train)
             else:
                 if isinstance(other[0], list):
                     other = [sent[0] for sent in other]
-                self.tokenizer.fit_on_texts(x_train + x_test + other)
+                self.tokenizer.fit_on_texts(x_train)
             # hopefully this staff helps to avoid issues with oov (NOT SURE needs to be checked)
             self.tokenizer.word_index = {e: i for e, i in self.tokenizer.word_index.items() if i <= self.max_features}
             self.tokenizer.word_index[self.tokenizer.oov_token] = self.max_features + 1

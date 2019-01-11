@@ -79,7 +79,7 @@ path_to_goal_sample = None
 
 verification_name = '/mnt/shdstorage/for_classification/new_test.csv'
 
-emb_type = 'w2v'
+emb_type = 'fasttext_2'
 
 X_train = pd.read_csv(x_train_set_name, header=None).values.tolist()
 X_test = pd.read_csv(x_test_set_name, header=None).values.tolist()
@@ -90,13 +90,14 @@ path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
 # column processed_texts_no_tags is missing
 texts = data.processed_text.tolist()
+print(texts)
 
-p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len)
-p.fit_processor(x_train=X_train, x_test=X_test, x_train_name=x_train_name, other=texts)
-X_train, y_train = p.prepare_input(X_train, y_train)
-print('Train params: ', len(X_train), len(y_train))
-X_test, y_test = p.prepare_input(X_test, y_test)
-print('Test params: ', len(X_test), len(y_test))
+p = Processor(max_features=max_features, emb_type=emb_type, max_len=max_len, emb_dim=emb_dim)
+p.fit_processor(x_train=X_train, x_train_name=x_train_name, other=texts)
+# X_train, y_train = p.prepare_input(X_train, y_train)
+# print('Train params: ', len(X_train), len(y_train))
+# X_test, y_test = p.prepare_input(X_test, y_test)
+# print('Test params: ', len(X_test), len(y_test))
 
 verification = p.prepare_input(texts)
 
@@ -159,12 +160,12 @@ print(model.summary())
 # norm = math.sqrt(sum(numpy.sum(K.get_value(w)) for w in model.optimizer.weights))
 
 
-# print('Loading weights...')
-# previous_weights = "/mnt/shdstorage/for_classification/models_dir/model_1543691537.h5"
-# model.load_weights(previous_weights)
+print('Loading weights...')
+previous_weights = "/mnt/shdstorage/for_classification/models_dir/model_1543691537.h5"
+model.load_weights(previous_weights)
 
 
-fit = True
+fit = False
 if fit:
     print('Train...')
     model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(X_test, y_test),
@@ -181,25 +182,24 @@ if fit:
 else:
     timing = previous_weights.split('/')[-1].split('_')[-1].split('.')[0]
 
-score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
+#score, acc = model.evaluate(X_test, y_test, batch_size=batch_size)
 
-print('Test score:', score)
-print('Test accuracy:', acc)
-
+# print('Test score:', score)
+# print('Test accuracy:', acc)
 # ============================== PRINT METRICS =====================================
 
-train_res = model.predict_classes(X_train)
-train_res = [i[0] for i in train_res]
-train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
-
-test_res = model.predict_classes(X_test)
-test_res = [i[0] for i in test_res]
-test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
+# train_res = model.predict_classes(X_train)
+# train_res = [i[0] for i in train_res]
+# train_1, train_0 = calculate_all_metrics(y_train, train_res, 'TRAIN')
+#
+# test_res = model.predict_classes(X_test)
+# test_res = [i[0] for i in test_res]
+# test_1, test_0 = calculate_all_metrics(y_test, test_res, 'TEST')
 
 ver_res = model.predict_classes(verification)
 path_to_verification = verification_name
 data = pd.read_csv(path_to_verification)
-label = data['label'].tolist()
+label = data['negative'].tolist()
 ver_res = [i[0] for i in ver_res]
 verif_1, verif_0 = calculate_all_metrics(label, ver_res, 'VERIFICATION')
 
