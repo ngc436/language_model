@@ -35,5 +35,3 @@ def calculate_precision(y_true, y_pred):
 
 def calculate_f1(y_true, y_pred):
     return f1_score(y_true, y_pred)
-
-# def
