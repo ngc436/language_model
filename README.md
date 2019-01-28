@@ -11,7 +11,7 @@ Current repository contains experiments on language modeling for text classifica
 - [x] Implement BiLSTM
 - [ ] Add CNN model
 - [ ] Add SVM and XgBoost tools
-- [x] Milestone: initial classification results (19 oct.)
+- [x] initial classification results
 - [x] Implement VAE  
 
 ## TODO's
@@ -70,14 +70,6 @@ Cleaner data
 - most of the examples in test set (15 samples from vk group with negative comments) were misclassified due to the ORG tag  
 - pretrained LM for russian: https://github.com/ppleskov/Russian-Language-Model
 
-## Datasets
- 
- v - dataset version  
- 
-* '/mnt/shdstorage/tmp/classif_tmp/X_train_v.csv'
-* '/mnt/shdstorage/tmp/classif_tmp/X_test_v.csv'
-* '/mnt/shdstorage/tmp/classif_tmp/y_train_v.csv'
-* '/mnt/shdstorage/tmp/classif_tmp/y_test_v.csv'
  
 ## Literature
 
@@ -88,4 +80,3 @@ Cleaner data
 5. A. Odena and I. Goodfellow, “Tensorfuzz: Debugging neural networks with coverage-guided fuzzing,” arXiv preprint arXiv:1807.10875, 2018.  
 6. Karpathy, A.; Johnson, J.; and Li, F.-F. 2015. Visualizing and understanding recurrent networks. arXiv preprint.
 7. Stephen Merity, Nitish Shirish Keskar, and Richard Socher. An analysis of neural language modeling at multiple scales. arXiv:1803.08240, 2018.  
-8. 
